@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "unisphere",
+    "slug": "unisphere",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D0B26"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.unisphere.app"
+    },
+    "android": {
+      "package": "com.unisphere.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D0B26"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f07ecfd4-560b-4690-8f40-3d56298ab784"
+      }
+    },
+    "plugins": [
+      "expo-notifications"
+    ],
+    "owner": "devikumar"
+  }
+}

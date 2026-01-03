@@ -1,0 +1,114 @@
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { query } = require('../db');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+
+// Register User
+router.post('/register', async (req, res) => {
+    const { fullName, email, password, department, role, username } = req.body;
+
+    if (!fullName || !email || !password || !username) {
+        return res.status(400).json({ error: 'Please provide all required fields' });
+    }
+
+    try {
+        // Check if user exists (email or username)
+        const userCheck = await query('SELECT * FROM users WHERE email = $1 OR username = $2', [email, username]);
+        if (userCheck.rows.length > 0) {
+            return res.status(400).json({ error: 'User with this email or username already exists' });
+        }
+
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+
+        // Insert user
+        const newUserMatches = await query(
+            'INSERT INTO users (full_name, email, password_hash, role, department, username) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, email, role, username',
+            [fullName, email, passwordHash, role || 'Student', department, username]
+        );
+
+        const newUser = newUserMatches.rows[0];
+
+        // Generate Token
+        const token = jwt.sign({ id: newUser.id }, JWT_SECRET, { expiresIn: '7d' });
+
+        res.json({
+            success: true,
+            token,
+            user: newUser
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error during registration' });
+    }
+});
+
+// Login User
+router.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Please provide email and password' });
+    }
+
+    try {
+        // Check user by email OR username
+        const userResult = await query(
+            'SELECT * FROM users WHERE email = $1 OR username = $2',
+            [email, email.startsWith('@') ? email.substring(1) : email]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid credentials' });
+        }
+
+        const user = userResult.rows[0];
+
+        // Check password
+        const isMatch = await bcrypt.compare(password, user.password_hash);
+        if (!isMatch) {
+            return res.status(400).json({ error: 'Invalid credentials' });
+        }
+
+        // Generate Token
+        const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '7d' });
+
+        res.json({
+            success: true,
+            token,
+            user: {
+                id: user.id,
+                name: user.full_name,
+                email: user.email,
+                username: user.username,
+                role: user.role,
+                department: user.department,
+                bio: user.bio_metadata?.bio,
+                location: user.bio_metadata?.location,
+                stats: user.bio_metadata?.stats
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error during login' });
+    }
+});
+
+// University Email Verification (Legacy support for UI flow)
+router.post('/verify', async (req, res) => {
+    const { email } = req.body;
+    // Simple check without DB for the initial screen
+    const isVerified = email && (email.endsWith('.edu') || email.includes('.ac.'));
+
+    if (isVerified) {
+        res.json({ success: true, message: 'Email verified' });
+    } else {
+        res.status(400).json({ success: false, message: 'Invalid university email' });
+    }
+});
+
+module.exports = router;
