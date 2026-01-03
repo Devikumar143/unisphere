@@ -1,0 +1,8 @@
+# Ignore the backend directory to prevent permission/missing file errors during EAS builds
+backend/
+node_modules/
+.git/
+.expo/
+dist/
+build/
+*.log

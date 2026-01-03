@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 // --- Production Configuration ---
-const PRODUCTION_URL = 'https://your-production-backend.com/api'; // REPLACE with your real production URL later
+const PRODUCTION_URL = 'https://unisphere-api.onrender.com/api';
 const DEVELOPMENT_URL = Platform.OS === 'web'
     ? 'http://localhost:5001/api'
     : 'http://10.144.108.250:5001/api';

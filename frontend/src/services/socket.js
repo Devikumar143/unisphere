@@ -1,8 +1,10 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = 'http://10.144.108.250:5001'; // Physical device
-// For Android emulator: 'http://10.0.2.2:5000'
-// For web browser: 'http://localhost:5000'
+const PRODUCTION_SOCKET_URL = 'https://unisphere-api.onrender.com';
+const DEVELOPMENT_SOCKET_URL = 'http://10.144.108.250:5001';
+
+// __DEV__ is true during local development, false in production builds
+const SOCKET_URL = __DEV__ ? DEVELOPMENT_SOCKET_URL : PRODUCTION_SOCKET_URL;
 
 let socket = null;
 
