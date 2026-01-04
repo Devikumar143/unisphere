@@ -15,7 +15,7 @@ import {
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { User, Mail, Lock, BookOpen, ArrowRight, AtSign, Eye, EyeOff } from 'lucide-react-native';
-import { COLORS, SIZES, GLASS } from '../constants/theme';
+import { COLORS, SIZES } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import { registerUser } from '../services/api';
 
@@ -60,13 +60,8 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
-            <LinearGradient
-                colors={[themeColors.bgDark, isDark ? '#0a0d1d' : '#F1F5F9']}
-                style={StyleSheet.absoluteFill}
-            />
-
-            <View style={[styles.glow, { backgroundColor: themeColors.accentSecondary }]} />
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Background decorative elements removed for Organic Earth style */}
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -74,11 +69,19 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
             >
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <View style={styles.header}>
-                        <Text style={[styles.title, { color: themeColors.textMain }]}>Join the Sphere</Text>
-                        <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>Create your university profile</Text>
+                        <Text style={[styles.title, {
+                            color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                            fontFamily: 'PlayfairDisplay-Bold'
+                        }]}>Join the Sphere</Text>
+                        <Text style={[styles.subtitle, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Create your university profile</Text>
                     </View>
 
-                    <BlurView intensity={GLASS.intensity} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: themeColors.border, backgroundColor: themeColors.bgCard }]}>
+                    <View style={[styles.card, {
+                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                        borderColor: themeColors.accentPrimary + '15',
+                        borderWidth: 1,
+                        borderRadius: 28
+                    }]}>
                         <InputField
                             label="Full Name"
                             icon={User}
@@ -86,6 +89,7 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
                             value={formData.fullName}
                             onChangeText={(v) => updateField('fullName', v)}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
 
                         <InputField
@@ -96,6 +100,7 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
                             onChangeText={(v) => updateField('username', v)}
                             autoCapitalize="none"
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
 
                         <InputField
@@ -106,6 +111,7 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
                             value={formData.email}
                             onChangeText={(v) => updateField('email', v)}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
 
                         <InputField
@@ -115,6 +121,7 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
                             value={formData.department}
                             onChangeText={(v) => updateField('department', v)}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
 
                         <InputField
@@ -125,12 +132,13 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
                             value={formData.password}
                             onChangeText={(v) => updateField('password', v)}
                             themeColors={themeColors}
+                            isDark={isDark}
                             rightElement={
                                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 10 }}>
                                     {showPassword ? (
-                                        <EyeOff color={themeColors.textDim} size={18} />
+                                        <EyeOff color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={18} />
                                     ) : (
-                                        <Eye color={themeColors.textDim} size={18} />
+                                        <Eye color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={18} />
                                     )}
                                 </TouchableOpacity>
                             }
@@ -139,16 +147,11 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
                         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
                         <TouchableOpacity
-                            style={styles.button}
+                            style={[styles.button, { backgroundColor: themeColors.accentPrimary }]}
                             onPress={handleRegister}
                             disabled={loading}
                         >
-                            <LinearGradient
-                                colors={[themeColors.accentPrimary, themeColors.accentSecondary]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.buttonGradient}
-                            >
+                            <View style={styles.buttonGradient}>
                                 {loading ? (
                                     <ActivityIndicator color="white" />
                                 ) : (
@@ -157,29 +160,29 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
                                         <ArrowRight color="white" size={20} style={{ marginLeft: 8 }} />
                                     </>
                                 )}
-                            </LinearGradient>
+                            </View>
                         </TouchableOpacity>
 
                         <TouchableOpacity onPress={onBackToLogin} style={styles.footerBtn}>
-                            <Text style={[styles.footerText, { color: themeColors.textDim }]}>
+                            <Text style={[styles.footerText, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
                                 Already have an account? <Text style={[styles.link, { color: themeColors.accentPrimary }]}>Login</Text>
                             </Text>
                         </TouchableOpacity>
-                    </BlurView>
+                    </View>
                 </ScrollView>
             </KeyboardAvoidingView>
         </View>
     );
 }
 
-const InputField = ({ label, icon: Icon, themeColors = COLORS, rightElement, ...props }) => (
+const InputField = ({ label, icon: Icon, themeColors, rightElement, isDark, ...props }) => (
     <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: themeColors.textMuted }]}>{label}</Text>
-        <View style={[styles.inputWrapper, { backgroundColor: themeColors.bgDark, borderColor: themeColors.border }]}>
+        <Text style={[styles.label, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>{label}</Text>
+        <View style={[styles.inputWrapper, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight, borderColor: themeColors.accentPrimary + '10' }]}>
             <Icon color={themeColors.accentPrimary} size={18} style={styles.inputIcon} />
             <TextInput
-                style={[styles.input, { color: themeColors.textMain }]}
-                placeholderTextColor={themeColors.textDim}
+                style={[styles.input, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}
+                placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
                 autoCapitalize="none"
                 {...props}
             />

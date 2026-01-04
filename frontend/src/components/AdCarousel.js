@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity, FlatList, Dimensions, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useTheme } from '../context/ThemeContext';
 import { ExternalLink } from 'lucide-react-native';
 
@@ -40,9 +39,9 @@ export default function AdCarousel({ ads }) {
 
             {item.redirect_url && (
                 <View style={styles.linkIcon}>
-                    <BlurView intensity={30} tint="dark" style={styles.linkBlur}>
+                    <View style={[styles.linkOverlay, { backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 14, padding: 7 }]}>
                         <ExternalLink size={14} color="white" />
-                    </BlurView>
+                    </View>
                 </View>
             )}
         </TouchableOpacity>
@@ -125,11 +124,7 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         overflow: 'hidden',
         backgroundColor: '#1E1E1E',
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
+        elevation: 2,
     },
     image: {
         width: '100%',
@@ -166,19 +161,18 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '900',
         letterSpacing: -0.5,
+        fontFamily: 'PlayfairDisplay-SemiBold',
     },
     linkIcon: {
         position: 'absolute',
         top: 12,
         right: 12,
     },
-    linkBlur: {
+    linkOverlay: {
         width: 28,
         height: 28,
-        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
-        overflow: 'hidden',
     },
     pagination: {
         flexDirection: 'row',

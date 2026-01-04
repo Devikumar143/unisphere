@@ -28,23 +28,27 @@ export default function PremiumConversationTile({ user, onPress }) {
             activeOpacity={0.8}
             style={styles.container}
         >
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? "dark" : "light"} style={styles.card}>
+            <View style={[styles.card, {
+                backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                borderWidth: 1
+            }]}>
                 <View style={styles.avatarContainer}>
                     <LinearGradient
                         colors={user.isOnline ? [themeColors.accentPrimary, themeColors.accentSecondary] : ['transparent', 'transparent']}
                         style={styles.avatarGlow}
                     >
-                        <Image source={{ uri: user.avatar }} style={styles.avatar} />
+                        <Image source={{ uri: user.avatar }} style={[styles.avatar, { backgroundColor: isDark ? '#1A1A1A' : '#EAE0D5' }]} />
                     </LinearGradient>
-                    {user.isOnline && <View style={styles.onlineIndicator} />}
+                    {user.isOnline && <View style={[styles.onlineIndicator, { borderColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]} />}
                 </View>
 
                 <View style={styles.content}>
                     <View style={styles.topRow}>
-                        <Text style={[styles.name, { color: themeColors.textMain, fontWeight: hasUnread ? '900' : '700' }]} numberOfLines={1}>
+                        <Text style={[styles.name, { color: isDark ? themeColors.textMain : themeColors.textMainLight, fontWeight: hasUnread ? '900' : '700' }]} numberOfLines={1}>
                             {user.name}
                         </Text>
-                        <Text style={[styles.time, { color: hasUnread ? themeColors.accentPrimary : themeColors.textDim }]}>
+                        <Text style={[styles.time, { color: hasUnread ? themeColors.accentPrimary : (isDark ? themeColors.textDim : themeColors.textDimLight) }]}>
                             {formatTime(user.lastMessageTime || user.updatedAt)}
                         </Text>
                     </View>
@@ -53,7 +57,7 @@ export default function PremiumConversationTile({ user, onPress }) {
                         <Text
                             style={[
                                 styles.lastMessage,
-                                { color: hasUnread ? themeColors.textMain : themeColors.textDim, fontWeight: hasUnread ? '600' : '400' }
+                                { color: hasUnread ? (isDark ? themeColors.textMain : themeColors.textMainLight) : (isDark ? themeColors.textDim : themeColors.textDimLight), fontWeight: hasUnread ? '600' : '400' }
                             ]}
                             numberOfLines={1}
                         >
@@ -65,14 +69,14 @@ export default function PremiumConversationTile({ user, onPress }) {
                                 <Text style={styles.unreadCount}>{user.unreadCount}</Text>
                             </View>
                         ) : (
-                            <ChevronRight size={16} color={themeColors.textDim} opacity={0.3} />
+                            <ChevronRight size={16} color={isDark ? themeColors.textDim : themeColors.textDimLight} opacity={0.3} />
                         )}
                     </View>
                 </View>
 
                 {/* Subtle Inner Highlight */}
                 <View style={[styles.innerHighlight, { borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]} />
-            </BlurView>
+            </View>
         </TouchableOpacity>
     );
 }

@@ -57,30 +57,35 @@ export default function LoginScreen({ onLogin, onGoToRegister }) {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
-            <LinearGradient
-                colors={[themeColors.bgDark, isDark ? '#0a0d1d' : '#F1F5F9']}
-                style={StyleSheet.absoluteFill}
-            />
-
-            {/* Background Decorative Blur */}
-            <View style={[styles.glow, { backgroundColor: themeColors.accentPrimary }]} />
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Decorative background elements removed for Organic Earth style */}
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.content}
             >
                 <View style={styles.header}>
-                    <View style={[styles.logoContainer, { backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.2)', borderColor: 'rgba(99, 102, 241, 0.2)' }]}>
+                    <View style={[styles.logoContainer, {
+                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                        borderColor: themeColors.accentPrimary + '20'
+                    }]}>
                         <GraduationCap color={themeColors.accentPrimary} size={48} strokeWidth={1.5} />
                     </View>
-                    <Text style={[styles.title, { color: themeColors.textMain }]}>UniSphere</Text>
-                    <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>Your university, digitalized.</Text>
+                    <Text style={[styles.title, {
+                        color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                        fontFamily: 'PlayfairDisplay-Bold'
+                    }]}>UniSphere</Text>
+                    <Text style={[styles.subtitle, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Your university, digitalized.</Text>
                 </View>
 
-                <BlurView intensity={GLASS.intensity} tint={isDark ? "dark" : "light"} style={[styles.loginCard, { borderColor: themeColors.border, backgroundColor: themeColors.bgCard }]}>
-                    <Text style={[styles.inputLabel, { color: themeColors.textMuted }]}>Email or Username</Text>
-                    <View style={[styles.inputContainer, { backgroundColor: themeColors.bgDark, borderColor: themeColors.border }]}>
+                <View style={[styles.loginCard, {
+                    backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                    borderColor: themeColors.accentPrimary + '15',
+                    borderWidth: 1,
+                    borderRadius: 28
+                }]}>
+                    <Text style={[styles.inputLabel, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Email or Username</Text>
+                    <View style={[styles.inputContainer, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight, borderColor: themeColors.accentPrimary + '10' }]}>
                         <TextInput
                             style={[styles.input, { color: themeColors.textMain }]}
                             placeholder="name@university.edu or @username"
@@ -92,21 +97,21 @@ export default function LoginScreen({ onLogin, onGoToRegister }) {
                         />
                     </View>
 
-                    <Text style={[styles.inputLabel, { color: themeColors.textMuted }]}>Password</Text>
-                    <View style={[styles.inputContainer, { backgroundColor: themeColors.bgDark, borderColor: themeColors.border, flexDirection: 'row', alignItems: 'center' }]}>
+                    <Text style={[styles.inputLabel, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Password</Text>
+                    <View style={[styles.inputContainer, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight, borderColor: themeColors.accentPrimary + '10', flexDirection: 'row', alignItems: 'center' }]}>
                         <TextInput
-                            style={[styles.input, { color: themeColors.textMain, flex: 1 }]}
+                            style={[styles.input, { color: isDark ? themeColors.textMain : themeColors.textMainLight, flex: 1 }]}
                             placeholder="••••••••"
-                            placeholderTextColor={themeColors.textDim}
+                            placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
                             secureTextEntry={!showPassword}
                             value={password}
                             onChangeText={setPassword}
                         />
                         <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 10 }}>
                             {showPassword ? (
-                                <EyeOff color={themeColors.textDim} size={20} />
+                                <EyeOff color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={20} />
                             ) : (
-                                <Eye color={themeColors.textDim} size={20} />
+                                <Eye color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={20} />
                             )}
                         </TouchableOpacity>
                     </View>
@@ -114,16 +119,11 @@ export default function LoginScreen({ onLogin, onGoToRegister }) {
                     {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
                     <TouchableOpacity
-                        style={styles.button}
+                        style={[styles.button, { backgroundColor: themeColors.accentPrimary }]}
                         onPress={handleLogin}
                         disabled={loading}
                     >
-                        <LinearGradient
-                            colors={[COLORS.accentPrimary, COLORS.accentSecondary]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.buttonGradient}
-                        >
+                        <View style={styles.buttonGradient}>
                             {loading ? (
                                 <ActivityIndicator color="white" />
                             ) : (
@@ -132,15 +132,15 @@ export default function LoginScreen({ onLogin, onGoToRegister }) {
                                     <ArrowRight color="white" size={20} style={{ marginLeft: 8 }} />
                                 </>
                             )}
-                        </LinearGradient>
+                        </View>
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={onGoToRegister} style={styles.footerBtn}>
-                        <Text style={[styles.footerText, { color: themeColors.textDim }]}>
+                        <Text style={[styles.footerText, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
                             Don't have an account? <Text style={[styles.link, { color: themeColors.accentPrimary }]}>Register</Text>
                         </Text>
                     </TouchableOpacity>
-                </BlurView>
+                </View>
 
                 <Text style={[styles.footer, { color: themeColors.textDim }]}>
                     Exclusively for verified university students.
@@ -200,8 +200,8 @@ const styles = StyleSheet.create({
         padding: 24,
         borderRadius: SIZES.radiusLarge,
         overflow: 'hidden',
-        borderWidth: GLASS.borderWidth,
-        borderColor: GLASS.borderColor,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
     },
     inputLabel: {
         color: COLORS.textMuted,

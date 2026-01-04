@@ -40,6 +40,12 @@ app.use(morgan(logFormat));
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Attach Socket.io to request for use in routes
+app.use((req, res, next) => {
+    req.io = io;
+    next();
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
@@ -58,6 +64,31 @@ app.post('/api/logs', (req, res) => {
     const timestamp = new Date().toISOString();
     console.log(`[MOBILE-${level.toString().toUpperCase()}] ${timestamp}: ${message}`, details || '');
     res.sendStatus(200);
+});
+
+// Metadata Preview
+const { getLinkPreview } = require('link-preview-js');
+app.post('/api/metadata', async (req, res) => {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'URL is required' });
+
+    try {
+        const data = await getLinkPreview(url, {
+            timeout: 5000,
+            headers: {
+                "user-agent": "googlebot", // Helps with some sites blocking strict scrapers
+            }
+        });
+        res.json({
+            title: data.title,
+            description: data.description,
+            image: data.images ? data.images[0] : (data.favicons ? data.favicons[0] : null),
+            url: data.url
+        });
+    } catch (error) {
+        console.error('Metadata Fetch Error', error);
+        res.status(500).json({ error: 'Failed to fetch metadata' });
+    }
 });
 
 // Basic Route
@@ -211,16 +242,16 @@ io.on('connection', (socket) => {
 
     // Handle sending messages
     socket.on('send_message', async (data) => {
-        const { senderId, recipientId, content, replyToMessageId, encrypted, messageType, voiceUrl, voiceDuration } = data;
+        const { senderId, recipientId, content, replyToMessageId, encrypted, messageType, voiceUrl, voiceDuration, attachmentUrls } = data;
 
         // Save to database
         try {
             const sql = `
-                INSERT INTO chat_messages (sender_id, recipient_id, message, reply_to_message_id, encrypted, message_type, voice_url, voice_duration)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                RETURNING id, sender_id, recipient_id, message, sent_at, reply_to_message_id, encrypted, message_type, voice_url, voice_duration, reactions
+                INSERT INTO chat_messages (sender_id, recipient_id, message, reply_to_message_id, encrypted, message_type, voice_url, voice_duration, attachment_urls)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING id, sender_id, recipient_id, message, sent_at, reply_to_message_id, encrypted, message_type, voice_url, voice_duration, reactions, attachment_urls
             `;
-            const result = await query(sql, [senderId, recipientId, content, replyToMessageId, encrypted || false, messageType || 'text', voiceUrl, voiceDuration]);
+            const result = await query(sql, [senderId, recipientId, content, replyToMessageId, encrypted || false, messageType || 'text', voiceUrl, voiceDuration, attachmentUrls]);
             const message = result.rows[0];
 
             // Send to recipient if online
@@ -236,7 +267,8 @@ io.on('connection', (socket) => {
                     encrypted: message.encrypted,
                     messageType: message.message_type,
                     voiceUrl: message.voice_url,
-                    voiceDuration: message.voice_duration
+                    voiceDuration: message.voice_duration,
+                    attachmentUrls: message.attachment_urls
                 });
             }
 
@@ -261,7 +293,8 @@ io.on('connection', (socket) => {
                 replyToMessageId: message.reply_to_message_id,
                 messageType: message.message_type,
                 voiceUrl: message.voice_url,
-                voiceDuration: message.voice_duration
+                voiceDuration: message.voice_duration,
+                attachmentUrls: message.attachment_urls
             });
         } catch (error) {
             console.error('Error saving message:', error);
@@ -271,15 +304,15 @@ io.on('connection', (socket) => {
 
     // Handle sending Group (Lounge) messages
     socket.on('send_group_message', async (data) => {
-        const { senderId, communityId, content, replyTo } = data;
+        const { senderId, communityId, content, replyTo, messageType, voiceUrl, voiceDuration, attachmentUrls } = data;
 
         try {
             const sql = `
-                INSERT INTO chat_messages (sender_id, group_id, message, reply_to_message_id)
-                VALUES ($1, $2, $3, $4)
-                RETURNING id, sender_id, group_id, message, sent_at, reply_to_message_id
+                INSERT INTO chat_messages (sender_id, group_id, message, reply_to_message_id, message_type, voice_url, voice_duration, attachment_urls)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                RETURNING id, sender_id, group_id, message, sent_at, reply_to_message_id, message_type, voice_url, voice_duration, attachment_urls
             `;
-            const result = await query(sql, [senderId, communityId, content, replyTo]);
+            const result = await query(sql, [senderId, communityId, content, replyTo, messageType || 'text', voiceUrl, voiceDuration, attachmentUrls]);
             const message = result.rows[0];
 
             // Fetch sender info for broadcast
@@ -294,7 +327,11 @@ io.on('connection', (socket) => {
                 communityId: message.group_id,
                 content: message.message,
                 timestamp: message.sent_at,
-                replyTo: message.reply_to_message_id
+                replyTo: message.reply_to_message_id,
+                messageType: message.message_type,
+                voiceUrl: message.voice_url,
+                voiceDuration: message.voice_duration,
+                attachmentUrls: message.attachment_urls
             });
 
             // Confirm to sender (optional if they already receive from the room)

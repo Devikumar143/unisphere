@@ -1,9 +1,7 @@
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator, Alert, FlatList, Modal, TextInput, Platform, Animated } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
 import { useTheme } from '../context/ThemeContext';
-import { COLORS, SIZES } from '../constants/theme';
+import { SIZES } from '../constants/theme';
 import { ArrowLeft, Plus, Grid, Settings, Save, Trash2, X, MessageSquare } from 'lucide-react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { fetchCommunityDetails, fetchCommunityPosts, joinCommunity, leaveCommunity, updateCommunity, deleteCommunity } from '../services/api';
@@ -27,24 +25,7 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
     const [updating, setUpdating] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleting, setDeleting] = useState(false);
-    const [auraAnim] = useState(new Animated.Value(0));
-
-    React.useEffect(() => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(auraAnim, {
-                    toValue: 1,
-                    duration: 5000,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(auraAnim, {
-                    toValue: 0,
-                    duration: 5000,
-                    useNativeDriver: true,
-                }),
-            ])
-        ).start();
-    }, []);
+    // Aura animation removed for Organic Earth style
 
     const loadData = async () => {
         try {
@@ -142,7 +123,7 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
 
     if (loading) {
         return (
-            <View style={[styles.container, { backgroundColor: themeColors.bgDark, justifyContent: 'center', alignItems: 'center' }]}>
+            <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight, justifyContent: 'center', alignItems: 'center' }]}>
                 <ActivityIndicator size="large" color={themeColors.accentPrimary} />
             </View>
         );
@@ -151,53 +132,35 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
     if (!community) return null;
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
             <SafeAreaView style={styles.safeArea}>
-                {/* Header */}
                 {/* Header */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                        <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={styles.headerIcon}>
-                            <ArrowLeft color={themeColors.textMain} size={24} />
-                        </BlurView>
+                        <View style={[styles.headerIcon, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, borderColor: themeColors.accentPrimary + '15', borderWidth: 1 }]}>
+                            <ArrowLeft color={isDark ? themeColors.textMain : themeColors.textMainLight} size={24} />
+                        </View>
                     </TouchableOpacity>
 
-                    <Text style={[styles.headerTitle, { color: themeColors.textMain }]} numberOfLines={1}>
+                    <Text style={[styles.headerTitle, {
+                        color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                        fontFamily: 'PlayfairDisplay-Bold'
+                    }]} numberOfLines={1}>
                         {community.name}
                     </Text>
 
                     {community.user_role === 'admin' ? (
                         <TouchableOpacity onPress={openSettings}>
-                            <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={styles.headerIcon}>
-                                <Settings color={themeColors.textDim} size={24} />
-                            </BlurView>
+                            <View style={[styles.headerIcon, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, borderColor: themeColors.accentPrimary + '15', borderWidth: 1 }]}>
+                                <Settings color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={24} />
+                            </View>
                         </TouchableOpacity>
                     ) : (
                         <View style={{ width: 40 }} />
                     )}
                 </View>
 
-                {/* Aura Effect */}
-                <Animated.View style={[
-                    styles.auraContainer,
-                    {
-                        opacity: auraAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [0.2, 0.4]
-                        }),
-                        transform: [{
-                            scale: auraAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [1, 1.3]
-                            })
-                        }]
-                    }
-                ]}>
-                    <LinearGradient
-                        colors={[themeColors.accentPrimary + '40', 'transparent']}
-                        style={styles.aura}
-                    />
-                </Animated.View>
+                {/* Aura Effect removed for Organic Earth style */}
 
                 <FlatList
                     data={posts}
@@ -205,17 +168,14 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
                     contentContainerStyle={styles.content}
                     ListHeaderComponent={
                         <View style={styles.infoSection}>
-                            {/* Blurred Background Banner */}
+                            {/* Background Banner */}
                             <View style={styles.bannerContainer}>
                                 {community.icon ? (
-                                    <Image source={{ uri: community.icon }} style={styles.bannerImage} blurRadius={10} />
+                                    <Image source={{ uri: community.icon }} style={styles.bannerImage} blurRadius={community.icon ? 5 : 0} />
                                 ) : (
-                                    <View style={[styles.bannerPlaceholder, { backgroundColor: themeColors.accentPrimary + '30' }]} />
+                                    <View style={[styles.bannerPlaceholder, { backgroundColor: themeColors.accentPrimary + '15' }]} />
                                 )}
-                                <LinearGradient
-                                    colors={['transparent', themeColors.bgDark]}
-                                    style={styles.bannerGradient}
-                                />
+                                <View style={[styles.bannerGradient, { backgroundColor: isDark ? themeColors.bgDark + '80' : themeColors.bgLight + '80' }]} />
                             </View>
 
                             <View style={styles.contentOverlay}>
@@ -228,40 +188,44 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
                                 </View>
 
                                 <View style={styles.titleRow}>
-                                    <Text style={[styles.title, { color: themeColors.textMain }]}>{community.name}</Text>
+                                    <Text style={[styles.title, {
+                                        color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                        fontFamily: 'PlayfairDisplay-Bold'
+                                    }]}>{community.name}</Text>
                                     {community.user_role === 'admin' && (
-                                        <LinearGradient
-                                            colors={[themeColors.accentPrimary, themeColors.accentSecondary || themeColors.accentPrimary]}
-                                            style={styles.adminBadge}
-                                        >
+                                        <View style={[styles.adminBadge, { backgroundColor: themeColors.accentPrimary }]}>
                                             <Text style={styles.adminBadgeText}>Admin</Text>
-                                        </LinearGradient>
+                                        </View>
                                     )}
                                 </View>
 
-                                <Text style={[styles.description, { color: themeColors.textMuted }]}>{community.description}</Text>
+                                <Text style={[styles.description, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>{community.description}</Text>
 
-                                <View style={styles.statsContainer}>
+                                <View style={[styles.statsContainer, {
+                                    backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                                    borderColor: themeColors.accentPrimary + '15',
+                                    borderWidth: 1
+                                }]}>
                                     <View style={styles.statItem}>
-                                        <Text style={[styles.statNumber, { color: themeColors.textMain }]}>{community.member_count}</Text>
-                                        <Text style={[styles.statLabel, { color: themeColors.textDim }]}>Members</Text>
+                                        <Text style={[styles.statNumber, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{community.member_count}</Text>
+                                        <Text style={[styles.statLabel, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Members</Text>
                                     </View>
-                                    <View style={[styles.statDivider, { backgroundColor: themeColors.textMuted + '30' }]} />
+                                    <View style={[styles.statDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]} />
                                     <View style={styles.statItem}>
-                                        <Text style={[styles.statNumber, { color: themeColors.textMain }]}>{community.type}</Text>
-                                        <Text style={[styles.statLabel, { color: themeColors.textDim }]}>Type</Text>
+                                        <Text style={[styles.statNumber, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{community.type}</Text>
+                                        <Text style={[styles.statLabel, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Type</Text>
                                     </View>
                                 </View>
 
                                 {community.admin_details && (
-                                    <View style={[styles.adminContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
-                                        <Text style={[styles.adminLabel, { color: themeColors.textDim }]}>Created by</Text>
+                                    <View style={[styles.adminContainer, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, borderColor: themeColors.accentPrimary + '15', borderWidth: 1 }]}>
+                                        <Text style={[styles.adminLabel, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Created by</Text>
                                         <View style={styles.adminProfile}>
                                             <Image
                                                 source={{ uri: community.admin_details.avatar || 'https://via.placeholder.com/40' }}
                                                 style={styles.adminAvatar}
                                             />
-                                            <Text style={[styles.adminName, { color: themeColors.textMain }]}>
+                                            <Text style={[styles.adminName, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
                                                 {community.admin_details.name}
                                             </Text>
                                         </View>
@@ -273,15 +237,15 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
                                     style={[
                                         styles.joinButton,
                                         {
-                                            backgroundColor: community.is_member ? themeColors.textMuted + '20' : themeColors.accentPrimary,
-                                            borderColor: community.is_member ? themeColors.border : 'transparent',
+                                            backgroundColor: community.is_member ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') : themeColors.accentPrimary,
+                                            borderColor: community.is_member ? themeColors.accentPrimary + '30' : 'transparent',
                                             borderWidth: community.is_member ? 1 : 0
                                         }
                                     ]}
                                     onPress={community.is_member ? handleLeave : handleJoin}
                                     disabled={joining}
                                 >
-                                    <Text style={[styles.joinButtonText, { color: community.is_member ? themeColors.textMain : 'white' }]}>
+                                    <Text style={[styles.joinButtonText, { color: community.is_member ? (isDark ? themeColors.textMain : themeColors.textMainLight) : 'white' }]}>
                                         {joining ? 'Updating...' : community.is_member ? 'Joined' : 'Join Community'}
                                     </Text>
                                 </TouchableOpacity>
@@ -304,7 +268,7 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
                     )}
                     ListEmptyComponent={
                         <View style={styles.emptyFeed}>
-                            <Text style={{ color: themeColors.textDim }}>No posts yet. Be the first!</Text>
+                            <Text style={{ color: isDark ? themeColors.textMuted : themeColors.textMutedLight }}>No posts yet. Be the first!</Text>
                         </View>
                     }
                 />
@@ -325,9 +289,13 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
                     transparent={true}
                 >
                     <View style={styles.modalOverlay}>
-                        <BlurView intensity={isDark ? 50 : 80} tint={isDark ? "dark" : "light"} style={[styles.modalContent, { backgroundColor: themeColors.bgDark }]}>
+                        <View style={[styles.modalContent, {
+                            backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight,
+                            borderColor: themeColors.accentPrimary + '20',
+                            borderTopWidth: 1
+                        }]}>
                             <View style={styles.modalHeader}>
-                                <Text style={[styles.modalTitle, { color: themeColors.textMain }]}>Community Settings</Text>
+                                <Text style={[styles.modalTitle, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Community Settings</Text>
                                 <TouchableOpacity onPress={() => setShowSettings(false)}>
                                     <X color={themeColors.textDim} size={24} />
                                 </TouchableOpacity>
@@ -335,26 +303,34 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
 
                             <ScrollView style={styles.settingsScroll}>
                                 <View style={styles.inputGroup}>
-                                    <Text style={[styles.inputLabel, { color: themeColors.textDim }]}>Community Name</Text>
+                                    <Text style={[styles.inputLabel, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Community Name</Text>
                                     <TextInput
-                                        style={[styles.input, { color: themeColors.textMain, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F1F5F9' }]}
+                                        style={[styles.input, {
+                                            color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                            backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                                            borderColor: themeColors.accentPrimary + '15'
+                                        }]}
                                         value={editName}
                                         onChangeText={setEditName}
                                         placeholder="Name your club..."
-                                        placeholderTextColor={themeColors.textDim}
+                                        placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
                                     />
                                 </View>
 
                                 <View style={styles.inputGroup}>
-                                    <Text style={[styles.inputLabel, { color: themeColors.textDim }]}>Description</Text>
+                                    <Text style={[styles.inputLabel, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Description</Text>
                                     <TextInput
-                                        style={[styles.input, styles.textArea, { color: themeColors.textMain, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F1F5F9' }]}
+                                        style={[styles.input, styles.textArea, {
+                                            color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                            backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                                            borderColor: themeColors.accentPrimary + '15'
+                                        }]}
                                         value={editDesc}
                                         onChangeText={setEditDesc}
                                         multiline
                                         numberOfLines={4}
                                         placeholder="What is this club about?"
-                                        placeholderTextColor={themeColors.textDim}
+                                        placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
                                     />
                                 </View>
 
@@ -379,11 +355,11 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
                                     style={styles.deleteBtn}
                                     onPress={handleDeleteCommunity}
                                 >
-                                    <Trash2 color={themeColors.accentError} size={20} style={{ marginRight: 8 }} />
-                                    <Text style={[styles.deleteBtnText, { color: themeColors.accentError }]}>Delete Community</Text>
+                                    <Trash2 color={themeColors.error} size={20} style={{ marginRight: 8 }} />
+                                    <Text style={[styles.deleteBtnText, { color: themeColors.error }]}>Delete Community</Text>
                                 </TouchableOpacity>
                             </ScrollView>
-                        </BlurView>
+                        </View>
                     </View>
                 </Modal>
 
@@ -395,21 +371,28 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
                     onRequestClose={() => setShowDeleteConfirm(false)}
                 >
                     <View style={[styles.modalOverlay, { justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }]}>
-                        <BlurView intensity={isDark ? 50 : 80} tint={isDark ? "dark" : "light"} style={[styles.confirmCard, { backgroundColor: isDark ? 'rgba(30,30,40,0.9)' : 'white' }]}>
+                        <View style={[styles.confirmCard, {
+                            backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                            borderColor: themeColors.accentPrimary + '20',
+                            borderWidth: 1
+                        }]}>
                             <View style={styles.confirmIconContainer}>
-                                <Trash2 color={COLORS.error} size={32} />
+                                <Trash2 color={themeColors.error} size={32} />
                             </View>
-                            <Text style={[styles.confirmTitle, { color: themeColors.textMain }]}>Delete Community?</Text>
-                            <Text style={[styles.confirmMessage, { color: themeColors.textDim }]}>
+                            <Text style={[styles.confirmTitle, {
+                                color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                fontFamily: 'PlayfairDisplay-Bold'
+                            }]}>Delete Community?</Text>
+                            <Text style={[styles.confirmMessage, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
                                 Are you sure you want to delete "{community.name}"? This action cannot be undone and all posts will be lost.
                             </Text>
 
                             <View style={styles.confirmActions}>
                                 <TouchableOpacity
-                                    style={[styles.cancelBtn, { borderColor: themeColors.border }]}
+                                    style={[styles.cancelBtn, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}
                                     onPress={() => setShowDeleteConfirm(false)}
                                 >
-                                    <Text style={{ color: themeColors.textMain, fontWeight: '600' }}>Cancel</Text>
+                                    <Text style={{ color: isDark ? themeColors.textMain : themeColors.textMainLight, fontWeight: '600' }}>Cancel</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.confirmDeleteBtn, { backgroundColor: COLORS.error }]}
@@ -423,7 +406,7 @@ export default function CommunityDetailScreen({ user, route, onBack, onViewProfi
                                     )}
                                 </TouchableOpacity>
                             </View>
-                        </BlurView>
+                        </View>
                     </View>
                 </Modal>
             </SafeAreaView>
@@ -460,11 +443,10 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '900',
+        fontSize: 20,
+        fontFamily: 'PlayfairDisplay-Bold',
         flex: 1,
         textAlign: 'center',
-        opacity: 0, // Hidden until scroll if we had a proper scroll header
     },
     content: {
         paddingBottom: 100,
@@ -552,7 +534,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 24,
-        backgroundColor: 'rgba(255,255,255,0.05)',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 20,
@@ -607,19 +588,7 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
         elevation: 10,
     },
-    auraContainer: {
-        position: 'absolute',
-        top: '10%',
-        left: '10%',
-        width: 300,
-        height: 300,
-        zIndex: 0,
-    },
-    aura: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 150,
-    },
+    // Aura styles removed
     // Modal Styles
     modalOverlay: {
         flex: 1,
@@ -783,11 +752,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 12,
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 5,
+        elevation: 2,
     },
     loungeButtonText: {
         color: 'white',

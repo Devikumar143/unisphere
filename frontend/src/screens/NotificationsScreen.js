@@ -66,17 +66,18 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
             case 'LIKE': return <Heart size={20} color={COLORS.accentError} fill={COLORS.accentError} />;
             case 'COMMENT': return <MessageCircle size={20} color={COLORS.accentPrimary} fill={COLORS.accentPrimary} />;
             case 'FOLLOW': return <UserPlus size={20} color={COLORS.accentSuccess} />;
-            default: return <Bell size={20} color={themeColors.textDim} />;
+            default: return <Bell size={20} color={isDark ? themeColors.textDim : themeColors.textDimLight} />;
         }
     };
 
     const formatText = (item) => {
         const name = item.sender_name || 'Someone';
+        const textColor = isDark ? themeColors.textMain : themeColors.textMainLight;
         switch (item.type) {
-            case 'LIKE': return <Text style={{ color: themeColors.textMain }}><Text style={{ fontWeight: 'bold' }}>{name}</Text> liked your post.</Text>;
-            case 'COMMENT': return <Text style={{ color: themeColors.textMain }}><Text style={{ fontWeight: 'bold' }}>{name}</Text> commented on your post.</Text>;
-            case 'FOLLOW': return <Text style={{ color: themeColors.textMain }}><Text style={{ fontWeight: 'bold' }}>{name}</Text> started following you.</Text>;
-            default: return <Text style={{ color: themeColors.textMain }}>New notification.</Text>;
+            case 'LIKE': return <Text style={{ color: textColor }}><Text style={{ fontWeight: 'bold' }}>{name}</Text> liked your post.</Text>;
+            case 'COMMENT': return <Text style={{ color: textColor }}><Text style={{ fontWeight: 'bold' }}>{name}</Text> commented on your post.</Text>;
+            case 'FOLLOW': return <Text style={{ color: textColor }}><Text style={{ fontWeight: 'bold' }}>{name}</Text> started following you.</Text>;
+            default: return <Text style={{ color: textColor }}>New notification.</Text>;
         }
     };
 
@@ -92,34 +93,25 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
-            {/* Deep Base Background */}
-            <LinearGradient
-                colors={isDark ? ['#050810', '#000000'] : ['#F8FAFC', '#FFFFFF']}
-                style={StyleSheet.absoluteFill}
-            />
-
-            {/* Atmospheric Aura Glows */}
-            <View style={StyleSheet.absoluteFill}>
-                <View style={[styles.glowCircle, { top: -80, right: -120, backgroundColor: isDark ? '#3CB2E225' : '#3CB2E210' }]} />
-                <View style={[styles.glowCircle, { bottom: -50, left: -100, backgroundColor: isDark ? '#9C27B020' : '#9C27B008' }]} />
-                <View style={[styles.glowCircle, { top: '50%', left: '50%', width: 350, height: 350, backgroundColor: isDark ? '#6366F110' : '#6366F105' }]} />
-            </View>
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Background elements removed for Organic Earth style */}
 
             <SafeAreaView style={styles.safeArea}>
-                {/* Glassmorphic Floating Header */}
-                <BlurView intensity={isDark ? 100 : 100} tint={isDark ? "dark" : "light"} style={styles.headerGlass}>
+                {/* Floating Header */}
+                <View style={[styles.headerGlass, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
-                            <View style={[styles.btnHighlight, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]} />
-                            <ArrowLeft color={themeColors.textMain} size={22} />
+                        <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]} activeOpacity={0.7}>
+                            <ArrowLeft color={isDark ? themeColors.textMain : themeColors.textMainLight} size={22} />
                         </TouchableOpacity>
-                        <Text style={[styles.title, { color: themeColors.textMain }]}>Activity</Text>
+                        <Text style={[styles.title, {
+                            color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                            fontFamily: 'PlayfairDisplay-Bold'
+                        }]}>Activity</Text>
                         <TouchableOpacity onPress={handleMarkAllRead} style={styles.readAllBtn} activeOpacity={0.7}>
                             <Text style={[styles.readAll, { color: themeColors.accentPrimary }]}>Mark All</Text>
                         </TouchableOpacity>
                     </View>
-                </BlurView>
+                </View>
 
                 {loading ? (
                     <ActivityIndicator size="large" color={themeColors.accentPrimary} style={{ marginTop: 50 }} />
@@ -135,8 +127,8 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
                         contentContainerStyle={styles.list}
                         ListEmptyComponent={
                             <View style={styles.emptyContainer}>
-                                <Bell size={48} color={themeColors.textDim} style={{ marginBottom: 16, opacity: 0.5 }} />
-                                <Text style={[styles.emptyText, { color: themeColors.textDim }]}>No notifications yet</Text>
+                                <Bell size={48} color={isDark ? themeColors.textDim : themeColors.textDimLight} style={{ marginBottom: 16, opacity: 0.5 }} />
+                                <Text style={[styles.emptyText, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>No notifications yet</Text>
                             </View>
                         }
                         renderItem={({ item }) => {
@@ -150,29 +142,32 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
 
                             return (
                                 <TouchableOpacity style={styles.itemWrapper} onPress={() => handleNotificationPress(item)} activeOpacity={0.7}>
-                                    <BlurView intensity={item.is_read ? 15 : 25} tint={isDark ? "dark" : "light"} style={[styles.itemGlass, { borderColor: item.is_read ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.08)' }]}>
+                                    <View style={[styles.itemGlass, {
+                                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                                        borderColor: item.is_read ? 'transparent' : themeColors.accentPrimary + '20'
+                                    }]}>
                                         <View style={styles.row}>
                                             <View style={styles.avatarContainer}>
-                                                <LinearGradient colors={avatarGlow} style={styles.avatarGlow}>
+                                                <View style={[styles.avatarGlow, { backgroundColor: item.is_read ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') : themeColors.accentPrimary }]}>
                                                     {item.sender_avatar ? (
                                                         <Image source={{ uri: item.sender_avatar }} style={styles.avatar} />
                                                     ) : (
-                                                        <View style={[styles.avatar, { backgroundColor: themeColors.bgCard, justifyContent: 'center', alignItems: 'center' }]}>
-                                                            <User size={24} color={themeColors.textDim} />
+                                                        <View style={[styles.avatar, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight, justifyContent: 'center', alignItems: 'center' }]}>
+                                                            <User size={24} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
                                                         </View>
                                                     )}
-                                                </LinearGradient>
-                                                <View style={[styles.iconBadge, { backgroundColor: isDark ? '#0A0F1A' : '#F8FAFC' }]}>
+                                                </View>
+                                                <View style={[styles.iconBadge, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]}>
                                                     {renderIcon(item.type)}
                                                 </View>
                                             </View>
                                             <View style={styles.content}>
-                                                <Text style={styles.text}>{formatText(item)}</Text>
-                                                <Text style={[styles.time, { color: themeColors.textDim }]}>{formatTime(item.created_at)}</Text>
+                                                <Text style={[styles.text, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{formatText(item)}</Text>
+                                                <Text style={[styles.time, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>{formatTime(item.created_at)}</Text>
                                             </View>
                                             {!item.is_read && <View style={[styles.dot, { backgroundColor: themeColors.accentPrimary }]} />}
                                         </View>
-                                    </BlurView>
+                                    </View>
                                 </TouchableOpacity>
                             );
                         }}

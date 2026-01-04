@@ -1,0 +1,20 @@
+# Server Configuration
+PORT=5001
+NODE_ENV=development
+
+# Database Configuration (PostgreSQL)
+# Use DATABASE_URL for Production (e.g., Render/Heroku)
+DATABASE_URL=postgresql://unisphere_db_rkds_user:IA2gz5n09XXIwRnpPd3WUStEc0JPSd0U@dpg-d5cen3shg0os73e7e4mg-a/unisphere_db_rkds
+
+# Local Fallback Configuration (if DATABASE_URL is not set)
+DB_USER=postgres
+DB_HOST=localhost
+DB_NAME=unisphere
+DB_PASSWORD=postgres
+DB_PORT=5432
+
+# Security
+JWT_SECRET=your_super_secret_jwt_key_change_this_for_production
+
+# Optional: File Uploads
+UPLOAD_PATH=uploads

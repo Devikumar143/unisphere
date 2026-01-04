@@ -185,36 +185,27 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
-            <LinearGradient
-                colors={isDark ? ['#050810', '#000000'] : ['#F8FAFC', '#FFFFFF']}
-                style={StyleSheet.absoluteFill}
-            />
-
-            {/* Background Aura Glows */}
-            <View style={StyleSheet.absoluteFill}>
-                <View style={[styles.glowCircle, { top: -150, left: -150, backgroundColor: isDark ? '#3CB2E215' : '#3CB2E205' }]} />
-                <View style={[styles.glowCircle, { bottom: -150, right: -150, backgroundColor: isDark ? '#9C27B010' : '#9C27B003' }]} />
-            </View>
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Background Aura Glows removed for Organic Earth style */}
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                 {/* Header Cover */}
-                <View style={styles.coverContainer}>
-                    <Image source={{ uri: displayProfile.coverImage }} style={styles.coverImage} />
+                <View style={[styles.coverContainer, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgLight, borderBottomWidth: 1, borderBottomColor: isDark ? 'transparent' : 'rgba(0,0,0,0.05)' }]}>
+                    {/* Cover image removed as per user request */}
 
-                    {/* Deep Fade Gradient */}
-                    <LinearGradient
-                        colors={['rgba(0,0,0,0.1)', 'transparent', themeColors.bgDark]}
-                        style={StyleSheet.absoluteFill}
-                        stops={[0, 0.4, 0.95]}
-                    />
+                    {isDark && (
+                        <LinearGradient
+                            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.2)']}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    )}
 
                     {/* Back Button */}
                     {onBack && (
                         <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-                            <BlurView intensity={30} tint="dark" style={styles.iconButton}>
-                                <ArrowLeft color="#FFFFFF" size={20} />
-                            </BlurView>
+                            <View style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)' }]}>
+                                <ArrowLeft color={isDark ? "#FFFFFF" : themeColors.textMainLight} size={20} />
+                            </View>
                         </TouchableOpacity>
                     )}
 
@@ -230,9 +221,9 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                     {/* Settings Button */}
                     {isOwnProfile && (
                         <TouchableOpacity style={styles.settingsBtn} onPress={onOpenSettings}>
-                            <BlurView intensity={30} tint="dark" style={styles.iconButton}>
-                                <Settings color="#FFFFFF" size={20} />
-                            </BlurView>
+                            <View style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)' }]}>
+                                <Settings color={isDark ? "#FFFFFF" : themeColors.textMainLight} size={20} />
+                            </View>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -240,36 +231,38 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                 {/* Profile Information Section */}
                 <View style={styles.profileContent}>
                     <View style={styles.mainInfo}>
-                        <LinearGradient
-                            colors={[themeColors.accentPrimary, themeColors.accentSecondary]}
-                            style={styles.avatarBorder}
-                        >
+                        <View style={[styles.avatarBorder, { backgroundColor: themeColors.accentPrimary, padding: 4 }]}>
                             {displayProfile.avatar ? (
                                 <Image source={{ uri: displayProfile.avatar }} style={styles.avatar} />
                             ) : (
-                                <View style={[styles.avatar, { backgroundColor: themeColors.bgCard, justifyContent: 'center', alignItems: 'center' }]}>
+                                <View style={[styles.avatar, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, justifyContent: 'center', alignItems: 'center' }]}>
                                     <Users size={32} color={themeColors.textDim} />
                                 </View>
                             )}
-                            <View style={styles.onlineStatus} />
-                        </LinearGradient>
+                            <View style={[styles.onlineStatus, { borderColor: isDark ? themeColors.bgDark : themeColors.bgLight }]} />
+                        </View>
 
                         <View style={styles.nameSection}>
-                            <Text style={[styles.name, { color: themeColors.textMain }]}>{displayProfile.name}</Text>
+                            <Text style={[styles.name, {
+                                color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                fontFamily: 'PlayfairDisplay-Bold',
+                            }]}>{displayProfile.name}</Text>
                             <View style={styles.handleRow}>
-                                <Text style={[styles.handle, { color: themeColors.textDim }]}>@{displayProfile.username}</Text>
-                                <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(60, 178, 226, 0.15)' : 'rgba(60, 178, 226, 0.1)' }]}>
-                                    <Text style={[styles.badgeText, { color: themeColors.accentPrimary }]}>{displayProfile.role || 'Explorer'}</Text>
+                                <Text style={[styles.handle, {
+                                    color: isDark ? themeColors.textMuted : themeColors.textMutedLight,
+                                }]}>@{displayProfile.username}</Text>
+                                <View style={[styles.badge, { backgroundColor: themeColors.accentPrimary }]}>
+                                    <Text style={[styles.badgeText, { color: '#FFFFFF' }]}>{displayProfile.role || 'Explorer'}</Text>
                                 </View>
                             </View>
 
                             <View style={styles.locationGroup}>
                                 <View style={styles.metaRow}>
-                                    <MapPin size={14} color={themeColors.textDim} />
-                                    <Text style={[styles.metaText, { color: themeColors.textDim }]}>{displayProfile.location || 'Student City'}</Text>
+                                    <MapPin size={14} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
+                                    <Text style={[styles.metaText, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>{displayProfile.location || 'Student City'}</Text>
                                 </View>
                                 <View style={styles.metaRow}>
-                                    <LinkIcon size={14} color={themeColors.textDim} />
+                                    <LinkIcon size={14} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
                                     <Text style={[styles.metaText, { color: themeColors.accentPrimary }]}>unisphere.me/{displayProfile.username}</Text>
                                 </View>
                             </View>
@@ -282,7 +275,7 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                             label="Connections"
                             value={displayProfile.stats.connections}
                             icon={Users}
-                            color="#3CB2E2"
+                            color={themeColors.sage}
                         />
                         <TouchableOpacity
                             style={{ flex: 1 }}
@@ -292,43 +285,37 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                                 label="Posts"
                                 value={displayProfile.stats.posts || 0}
                                 icon={Grid}
-                                color="#9C27B0"
+                                color={themeColors.terracotta}
                             />
                         </TouchableOpacity>
-
                     </View>
 
                     {/* Bio Card */}
                     <View style={styles.bioWrapper}>
-                        <BlurView intensity={isDark ? 30 : 60} tint={isDark ? "dark" : "light"} style={styles.bioCard}>
-                            <Text style={[styles.bioLabel, { color: themeColors.textDim }]}>BIOGRAPHY</Text>
-                            <Text style={[styles.bioText, { color: themeColors.textMain }]}>
+                        <View style={[styles.bioCard, {
+                            backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                            borderColor: themeColors.accentPrimary + '10'
+                        }]}>
+                            <Text style={[styles.bioLabel, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>BIOGRAPHY</Text>
+                            <Text style={[styles.bioText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
                                 {displayProfile.bio || "Crafting experiences and building connections in the digital universe."}
                             </Text>
 
                             {/* Inner Accent Line */}
-                            <LinearGradient
-                                colors={[themeColors.accentPrimary, 'transparent']}
-                                style={styles.bioAccent}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 0, y: 1 }}
+                            <View
+                                style={[styles.bioAccent, { backgroundColor: themeColors.accentPrimary }]}
                             />
-                        </BlurView>
+                        </View>
                     </View>
 
                     {/* Primary Actions */}
                     <View style={styles.primaryActions}>
                         {isOwnProfile ? (
                             <TouchableOpacity style={styles.editProfileBtn} onPress={onEditProfile}>
-                                <LinearGradient
-                                    colors={[themeColors.accentPrimary, themeColors.accentSecondary]}
-                                    style={styles.actionGradient}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                >
+                                <View style={[styles.actionGradient, { backgroundColor: themeColors.accentPrimary }]}>
                                     <Edit3 color="white" size={18} style={{ marginRight: 8 }} />
                                     <Text style={styles.actionBtnText}>Update Profile</Text>
-                                </LinearGradient>
+                                </View>
                             </TouchableOpacity>
                         ) : (
                             <View style={styles.interactionRow}>
@@ -373,15 +360,15 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                             style={[styles.tabItem, activeTab === 'Activity' && styles.tabItemActive]}
                             onPress={() => setActiveTab('Activity')}
                         >
-                            <Grid size={20} color={activeTab === 'Activity' ? themeColors.accentPrimary : themeColors.textDim} />
-                            <Text style={[styles.tabText, { color: activeTab === 'Activity' ? themeColors.textMain : themeColors.textDim }]}>Activity</Text>
+                            <Grid size={20} color={activeTab === 'Activity' ? themeColors.accentPrimary : (isDark ? themeColors.textDim : themeColors.textDimLight)} />
+                            <Text style={[styles.tabText, { color: activeTab === 'Activity' ? (isDark ? themeColors.textMain : themeColors.textMainLight) : (isDark ? themeColors.textDim : themeColors.textDimLight) }]}>Activity</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.tabItem, activeTab === 'Saved' && styles.tabItemActive]}
                             onPress={() => setActiveTab('Saved')}
                         >
-                            <Bookmark size={20} color={activeTab === 'Saved' ? themeColors.accentPrimary : themeColors.textDim} />
-                            <Text style={[styles.tabText, { color: activeTab === 'Saved' ? themeColors.textMain : themeColors.textDim }]}>Saved</Text>
+                            <Bookmark size={20} color={activeTab === 'Saved' ? themeColors.accentPrimary : (isDark ? themeColors.textDim : themeColors.textDimLight)} />
+                            <Text style={[styles.tabText, { color: activeTab === 'Saved' ? (isDark ? themeColors.textMain : themeColors.textMainLight) : (isDark ? themeColors.textDim : themeColors.textDimLight) }]}>Saved</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -400,10 +387,10 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                                     />
                                 ))
                             ) : (
-                                <Text style={{ textAlign: 'center', color: themeColors.textDim, marginTop: 20 }}>No posts yet.</Text>
+                                <Text style={{ textAlign: 'center', color: isDark ? themeColors.textDim : themeColors.textDimLight, marginTop: 20 }}>No posts yet.</Text>
                             )
                         ) : (
-                            <Text style={{ textAlign: 'center', color: themeColors.textDim, marginTop: 20 }}>Saved posts coming soon.</Text>
+                            <Text style={{ textAlign: 'center', color: isDark ? themeColors.textDim : themeColors.textDimLight, marginTop: 20 }}>Saved posts coming soon.</Text>
                         )}
                     </View>
                 </View>
@@ -424,13 +411,13 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                         <View style={styles.confirmIconContainer}>
                             <Trash2 color={COLORS.error} size={32} />
                         </View>
-                        <Text style={[styles.confirmTitle, { color: themeColors.textMain }]}>Delete Post?</Text>
-                        <Text style={[styles.confirmMessage, { color: themeColors.textDim }]}>
+                        <Text style={[styles.confirmTitle, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Delete Post?</Text>
+                        <Text style={[styles.confirmMessage, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>
                             Are you sure you want to delete this post? This action cannot be undone.
                         </Text>
                         <View style={styles.confirmActions}>
-                            <TouchableOpacity style={[styles.cancelBtn, { borderColor: themeColors.border }]} onPress={hideDeleteConfirm}>
-                                <Text style={[styles.buttonText, { color: themeColors.textMain }]}>Cancel</Text>
+                            <TouchableOpacity style={[styles.cancelBtn, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]} onPress={hideDeleteConfirm}>
+                                <Text style={[styles.buttonText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={[styles.confirmDeleteBtn, { backgroundColor: COLORS.error }]} onPress={confirmDeletePost}>
                                 <Text style={[styles.buttonText, { color: 'white' }]}>Delete</Text>
@@ -447,16 +434,16 @@ const StatCard = ({ label, value, icon: Icon, color }) => {
     const { isDark, themeColors } = useTheme();
     return (
         <View style={styles.statCardWrapper}>
-            <BlurView intensity={isDark ? 20 : 50} tint={isDark ? "dark" : "light"} style={styles.statCard}>
-                <View style={[styles.statIconBox, { backgroundColor: color + '20' }]}>
+            <View style={[styles.statCard, {
+                backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+            }]}>
+                <View style={[styles.statIconBox, { backgroundColor: color + '15' }]}>
                     <Icon size={16} color={color} />
                 </View>
-                <Text style={[styles.statValue, { color: themeColors.textMain }]}>{value}</Text>
-                <Text style={styles.statLabel}>{label.toUpperCase()}</Text>
-
-                {/* Subtle Glow */}
-                <View style={[styles.statGlow, { backgroundColor: color, opacity: isDark ? 0.05 : 0.03 }]} />
-            </BlurView>
+                <Text style={[styles.statValue, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{value}</Text>
+                <Text style={[styles.statLabel, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>{label.toUpperCase()}</Text>
+            </View>
         </View>
     );
 };
@@ -477,8 +464,6 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     coverImage: {
-        width: '100%',
-        height: '100%',
     },
     settingsBtn: {
         position: 'absolute',

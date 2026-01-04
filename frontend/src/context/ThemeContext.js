@@ -1,11 +1,11 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { DARK_COLORS, LIGHT_COLORS } from '../constants/theme';
+import { EARTH_COLORS } from '../constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-    const [isDark, setIsDark] = useState(true);
+    const [isDark, setIsDark] = useState(false); // Default to light mode for Organic Earth
 
     useEffect(() => {
         loadTheme();
@@ -32,7 +32,7 @@ export const ThemeProvider = ({ children }) => {
         }
     };
 
-    const themeColors = isDark ? DARK_COLORS : LIGHT_COLORS;
+    const themeColors = EARTH_COLORS; // Now using unified Organic Earth palette
 
     return (
         <ThemeContext.Provider value={{ isDark, toggleTheme, themeColors }}>

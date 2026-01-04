@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Animated, Keyboard, Alert, Image, ActivityIndicator, Modal, Pressable } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Animated, Keyboard, Alert, Image, ActivityIndicator, Modal, Pressable, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { ArrowLeft, Send, Users, Info, Camera, Mic, Image as ImageIcon, Smile, ChevronRight, Sparkles, Zap, X, CornerDownRight, Trash2, Heart, MessageCircle, Save as SaveIcon, BarChart2, Plus } from 'lucide-react-native';
 import { COLORS, SIZES, GLASS } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
-import { fetchGroupMessages, saveMessage } from '../services/api';
+import * as ImagePicker from 'expo-image-picker';
+import { fetchGroupMessages, saveMessage, uploadFile, pinMessage, unpinMessage } from '../services/api';
+import LinkPreviewCard from '../components/LinkPreviewCard';
 import {
     getSocket,
 } from '../services/socket';
@@ -31,6 +33,149 @@ const getSenderColor = (seed) => {
     return SNAP_COLORS[Math.abs(hash) % SNAP_COLORS.length];
 };
 
+const AnimatedMessageBubble = ({ children, isReceived }) => {
+    const slideAnim = useRef(new Animated.Value(isReceived ? 20 : 50)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const scaleAnim = useRef(new Animated.Value(0.9)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                friction: 7,
+                tension: 40,
+                useNativeDriver: true,
+            }),
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 200,
+                useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                friction: 6,
+                tension: 45,
+                useNativeDriver: true,
+            })
+        ]).start();
+    }, []);
+
+    return (
+        <Animated.View style={{
+            opacity: fadeAnim,
+            transform: [
+                { translateY: slideAnim },
+                { scale: scaleAnim }
+            ]
+        }}>
+            {children}
+        </Animated.View>
+    );
+};
+
+const AnimatedReaction = ({ children }) => {
+    const scaleAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.spring(scaleAnim, {
+            toValue: 1,
+            friction: 5,
+            tension: 200, // High tension for "Pop"
+            useNativeDriver: true,
+        }).start();
+    }, []);
+
+    return (
+        <Animated.View style={{
+            transform: [{ scale: scaleAnim }]
+        }}>
+            {children}
+        </Animated.View>
+    );
+};
+
+const InteractableMessage = ({ children, onLongPress, style }) => {
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    const handlePressIn = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 0.96,
+            friction: 7,
+            useNativeDriver: true,
+        }).start();
+    };
+
+    const handlePressOut = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 1,
+            friction: 7,
+            useNativeDriver: true,
+        }).start();
+    };
+
+    return (
+        <TouchableWithoutFeedback
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            onLongPress={onLongPress}
+            delayLongPress={200}
+        >
+            <Animated.View style={[style, { transform: [{ scale: scaleAnim }] }]}>
+                {children}
+            </Animated.View>
+        </TouchableWithoutFeedback>
+    );
+};
+
+const TypingDot = ({ delay, color }) => {
+    const translateY = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(translateY, { toValue: -5, duration: 400, delay: delay, useNativeDriver: true }),
+                Animated.timing(translateY, { toValue: 0, duration: 400, useNativeDriver: true }),
+            ])
+        ).start();
+    }, []);
+
+    return <Animated.View style={[styles.typingDot, { backgroundColor: color, transform: [{ translateY }] }]} />;
+};
+
+const AnimatedTypingIndicator = ({ isDark, text }) => {
+    const opacityAnim = useRef(new Animated.Value(0.4)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(opacityAnim, {
+                    toValue: 1,
+                    duration: 800,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(opacityAnim, {
+                    toValue: 0.4,
+                    duration: 800,
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+    }, []);
+
+    return (
+        <View style={styles.typingContainer}>
+            <Animated.View style={{ opacity: opacityAnim, flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.typingText}>{text}</Text>
+                <View style={[styles.typingDots, { marginLeft: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                    {[0, 150, 300].map((delay, i) => (
+                        <TypingDot key={i} delay={delay} color={isDark ? '#FFF' : '#333'} />
+                    ))}
+                </View>
+            </Animated.View>
+        </View>
+    );
+};
+
 export default function LoungeScreen({ user, community, onBack }) {
     const { themeColors, isDark } = useTheme();
     const [messages, setMessages] = useState([]);
@@ -40,6 +185,14 @@ export default function LoungeScreen({ user, community, onBack }) {
     const [replyTo, setReplyTo] = useState(null);
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [showActions, setShowActions] = useState(false);
+    const [uploadingMedia, setUploadingMedia] = useState(false);
+
+    // Mention state
+    const [mentionQuery, setMentionQuery] = useState(null);
+    const [filteredMembers, setFilteredMembers] = useState([]);
+
+    // Pinned Message State
+    const [pinnedMessage, setPinnedMessage] = useState(null);
 
     // Poll state
     const [showPollCreator, setShowPollCreator] = useState(false);
@@ -100,6 +253,12 @@ export default function LoungeScreen({ user, community, onBack }) {
             socket.on('group_message_deleted', handleMessageDeleted);
             socket.on('update_poll_results', handlePollUpdate);
 
+            socket.on('community_pinned_message_updated', ({ communityId: cId, pinnedMessage: pm }) => {
+                if (cId === community.id) {
+                    setPinnedMessage(pm);
+                }
+            });
+
             return () => {
                 socket.emit('leave_community', community.id);
                 socket.off('receive_group_message', handleReceiveGroupMessage);
@@ -108,9 +267,10 @@ export default function LoungeScreen({ user, community, onBack }) {
                 socket.off('update_group_message_reactions', handleReactionUpdate);
                 socket.off('group_message_deleted', handleMessageDeleted);
                 socket.off('update_poll_results', handlePollUpdate);
+                socket.off('community_pinned_message_updated');
             };
         }
-    }, [community.id]);
+    }, [community?.id]);
 
     const loadMessages = async () => {
         try {
@@ -126,17 +286,108 @@ export default function LoungeScreen({ user, community, onBack }) {
 
     const handleTextChange = (text) => {
         setNewMessage(text);
-        if (!socket) return;
-
-        if (text.length > 0) {
+        if (socket) {
             socket.emit('typing_community', { communityId: community.id, userId: user.id, userName: user.full_name });
-
             if (typingTimeout.current) clearTimeout(typingTimeout.current);
             typingTimeout.current = setTimeout(() => {
                 socket.emit('stop_typing_community', { communityId: community.id, userId: user.id });
             }, 3000);
+        }
+
+        // Mention Detection
+        const lastWord = text.split(' ').pop();
+        if (lastWord && lastWord.startsWith('@')) {
+            const query = lastWord.slice(1).toLowerCase();
+            setMentionQuery(query);
+
+            // Filter members (using typing users as mock if community.members is missing)
+            const mockMembers = Object.values(typingUsers).length > 0
+                ? Object.entries(typingUsers).map(([id, name]) => ({ id, name, username: name.replace(/\s/g, '').toLowerCase() }))
+                : [{ name: 'Test User', username: 'test' }, { name: 'Admin', username: 'admin' }];
+
+            const members = community.members || mockMembers;
+
+            const filtered = members.filter(m =>
+                (m.name || m.username || '').toLowerCase().includes(query)
+            );
+            setFilteredMembers(filtered);
         } else {
-            socket.emit('stop_typing_community', { communityId: community.id, userId: user.id });
+            setMentionQuery(null);
+        }
+    };
+
+    const handleMentionSelect = (memberName) => {
+        const words = newMessage.split(' ');
+        words.pop(); // Remove the partial @mention
+        const text = words.join(' ') + (words.length > 0 ? ' ' : '') + `@${memberName} `;
+        setNewMessage(text);
+        setMentionQuery(null);
+    };
+
+    const handlePickMedia = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.All,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+
+            if (!result.canceled) {
+                sendMediaMessage(result.assets[0].uri, result.assets[0].type);
+            }
+        } catch (error) {
+            console.error('Error picking media:', error);
+            Alert.alert('Error', 'Failed to pick media');
+        }
+    };
+
+    const handleTakePhoto = async () => {
+        try {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
+                return;
+            }
+
+            const result = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+
+            if (!result.canceled) {
+                sendMediaMessage(result.assets[0].uri, 'image');
+            }
+        } catch (error) {
+            console.error('Error taking photo:', error);
+            Alert.alert('Error', 'Failed to take photo');
+        }
+    };
+
+    const sendMediaMessage = async (uri, type) => {
+        setUploadingMedia(true);
+        try {
+            const mediaUrl = await uploadFile(uri);
+            const messageType = type.includes('video') ? 'video' : 'image';
+
+            const messageData = {
+                senderId: user.id,
+                communityId: community.id,
+                content: messageType === 'image' ? 'Sent an image' : 'Sent a video',
+                messageType: messageType,
+                attachmentUrls: [mediaUrl],
+                replyTo: replyTo?.id
+            };
+
+            socket.emit('send_group_message', messageData);
+            setReplyTo(null);
+            setTimeout(scrollToBottom, 500);
+        } catch (error) {
+            console.error('Error uploading media:', error);
+            Alert.alert('Upload Failed', 'Failed to send media.');
+        } finally {
+            setUploadingMedia(false);
         }
     };
 
@@ -235,118 +486,187 @@ export default function LoungeScreen({ user, community, onBack }) {
         const senderColor = getSenderColor(item.senderId);
 
         return (
-            <TouchableOpacity
-                activeOpacity={0.9}
-                onLongPress={() => {
-                    setSelectedMessage(item);
-                    setShowActions(true);
-                }}
-                style={[
-                    styles.messageContainer,
-                    showSender && styles.messageWithSpacing
-                ]}
-            >
-                <View style={styles.messageRow}>
-                    <View style={[
-                        styles.statusPipe,
-                        { backgroundColor: isMe ? '#3CB2E2' : senderColor }
-                    ]} />
+            <AnimatedMessageBubble isReceived={!isMe}>
+                <InteractableMessage
+                    onLongPress={() => {
+                        setSelectedMessage(item);
+                        setShowActions(true);
+                    }}
+                    style={[
+                        styles.messageContainer,
+                        showSender && styles.messageWithSpacing
+                    ]}
+                >
+                    <View style={styles.messageRow}>
+                        <View style={[
+                            styles.statusPipe,
+                            { backgroundColor: isMe ? '#3CB2E2' : senderColor }
+                        ]} />
 
-                    <View style={styles.contentContainer}>
-                        {showSender && (
-                            <Text style={[styles.senderName, { color: isMe ? '#3CB2E2' : senderColor }]}>
-                                {isMe ? 'Me' : (item.senderName || 'Member')}
-                            </Text>
-                        )}
-
-                        {item.replyTo && (
-                            <View style={[styles.replySnippet, { borderLeftColor: senderColor + '40' }]}>
-                                <Text style={styles.replySender} numberOfLines={1}>{item.replyToSenderName || 'Member'}</Text>
-                                <Text style={styles.replyContent} numberOfLines={1}>{item.replyToContent}</Text>
-                            </View>
-                        )}
-
-                        {item.messageType === 'poll' && item.pollData ? (
-                            <View style={[styles.pollBubble, { borderColor: isMe ? '#3CB2E2' : senderColor }]}>
-                                <Text style={[styles.pollQuestion, { color: isDark ? '#FFF' : '#333' }]}>{item.pollData.question}</Text>
-                                {item.pollData.options.map((opt, idx) => {
-                                    const totalVotes = item.pollData.voters?.length || 0;
-                                    const percentage = totalVotes > 0 ? ((opt.votes?.length || 0) / totalVotes) * 100 : 0;
-                                    const isSelected = opt.votes?.includes(user.id);
-                                    const hasVoted = item.pollData.voters?.includes(user.id);
-
-                                    return (
-                                        <TouchableOpacity
-                                            key={idx}
-                                            style={[styles.pollOption, { backgroundColor: isDark ? '#1A1A1A' : '#F2F2F2' }]}
-                                            onPress={() => !hasVoted && handleVote(item.id, idx)}
-                                            activeOpacity={hasVoted ? 1 : 0.7}
-                                        >
-                                            <View style={[styles.pollProgress, { width: `${percentage}%`, backgroundColor: isSelected ? '#3CB2E2' : (isDark ? '#333' : '#E0E0E0') }]} />
-                                            <View style={styles.pollOptionContent}>
-                                                <Text style={[styles.pollOptionText, { color: isDark ? '#FFF' : '#333' }]}>{opt.text}</Text>
-                                                {hasVoted && <Text style={styles.pollOptionPercent}>{Math.round(percentage)}%</Text>}
-                                            </View>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                                <Text style={styles.pollFooter}>{item.pollData.voters?.length || 0} {item.pollData.voters?.length === 1 ? 'vote' : 'votes'}</Text>
-                            </View>
-                        ) : (
-                            <View style={styles.textWrapper}>
-                                <Text style={[
-                                    styles.messageText,
-                                    { color: isDark ? '#FFF' : '#000', opacity: item.isDeleted ? 0.5 : 1, fontStyle: item.isDeleted ? 'italic' : 'normal' }
-                                ]}>
-                                    {item.content}
+                        <View style={styles.contentContainer}>
+                            {showSender && (
+                                <Text style={[styles.senderName, { color: isMe ? '#3CB2E2' : senderColor }]}>
+                                    {isMe ? 'Me' : (item.senderName || 'Member')}
                                 </Text>
-                            </View>
-                        )}
+                            )}
 
-                        {/* Reactions Row */}
-                        {item.reactions && Object.keys(item.reactions).length > 0 && (
-                            <View style={styles.reactionsRow}>
-                                {Object.entries(item.reactions).map(([emoji, users]) => users.length > 0 ? (
-                                    <View key={emoji} style={[styles.reactionBadge, { backgroundColor: isDark ? '#1A1A1A' : '#F2F2F2' }]}>
-                                        <Text style={styles.reactionEmoji}>{emoji}</Text>
-                                        <Text style={[styles.reactionCount, { color: isDark ? '#FFF' : '#666' }]}>{users.length}</Text>
-                                    </View>
-                                ) : null)}
-                            </View>
-                        )}
+                            {item.replyTo && (
+                                <View style={[styles.replySnippet, { borderLeftColor: senderColor + '40' }]}>
+                                    <Text style={styles.replySender} numberOfLines={1}>{item.replyToSenderName || 'Member'}</Text>
+                                    <Text style={styles.replyContent} numberOfLines={1}>{item.replyToContent}</Text>
+                                </View>
+                            )}
+
+                            {item.messageType === 'poll' && item.pollData ? (
+                                <View style={[styles.pollBubble, { borderColor: isMe ? '#3CB2E2' : senderColor }]}>
+                                    <Text style={[styles.pollQuestion, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{item.pollData.question}</Text>
+                                    {item.pollData.options.map((opt, idx) => {
+                                        const totalVotes = item.pollData.voters?.length || 0;
+                                        const percentage = totalVotes > 0 ? ((opt.votes?.length || 0) / totalVotes) * 100 : 0;
+                                        const isSelected = opt.votes?.includes(user.id);
+                                        const hasVoted = item.pollData.voters?.includes(user.id);
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={idx}
+                                                style={[styles.pollOption, { backgroundColor: isDark ? '#1A1A1A' : '#F2F2F2' }]}
+                                                onPress={() => !hasVoted && handleVote(item.id, idx)}
+                                                activeOpacity={hasVoted ? 1 : 0.7}
+                                            >
+                                                <View style={[styles.pollProgress, { width: `${percentage}%`, backgroundColor: isSelected ? '#3CB2E2' : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)') }]} />
+                                                <View style={styles.pollOptionContent}>
+                                                    <Text style={[styles.pollOptionText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{opt.text}</Text>
+                                                    {hasVoted && <Text style={styles.pollOptionPercent}>{Math.round(percentage)}%</Text>}
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                    <Text style={styles.pollFooter}>{item.pollData.voters?.length || 0} {item.pollData.voters?.length === 1 ? 'vote' : 'votes'}</Text>
+                                </View>
+                            ) : item.messageType === 'image' || (item.attachmentUrls && item.attachmentUrls.length > 0) ? (
+                                <View style={styles.mediaMessageContainer}>
+                                    {item.attachmentUrls && item.attachmentUrls.map((url, idx) => (
+                                        <Image
+                                            key={idx}
+                                            source={{ uri: url }}
+                                            style={styles.messageImage}
+                                            resizeMode="cover"
+                                        />
+                                    ))}
+                                    {item.content && item.content !== 'Sent an image' && (
+                                        <Text style={[styles.messageText, { color: isDark ? themeColors.textMain : themeColors.textMainLight, marginTop: 8 }]}>
+                                            {item.content}
+                                        </Text>
+                                    )}
+                                </View>
+                            ) : (
+                                <View style={styles.textWrapper}>
+                                    <Text style={[
+                                        styles.messageText,
+                                        { color: isDark ? themeColors.textMain : themeColors.textMainLight, opacity: item.isDeleted ? 0.5 : 1, fontStyle: item.isDeleted ? 'italic' : 'normal' }
+                                    ]}>
+                                        {item.content.split(' ').map((word, i) => {
+                                            if (word.startsWith('@')) {
+                                                return <Text key={i} style={{ color: themeColors.accentPrimary, fontWeight: 'bold' }}>{word} </Text>;
+                                            }
+                                            return <Text key={i}>{word} </Text>;
+                                        })}
+                                    </Text>
+                                    {!item.isDeleted && (() => {
+                                        const urlMatch = item.content?.match(/(https?:\/\/[^\s]+)/);
+                                        return urlMatch ? <LinkPreviewCard url={urlMatch[0]} /> : null;
+                                    })()}
+                                </View>
+                            )}
+
+                            {/* Reactions Row */}
+                            {item.reactions && Object.keys(item.reactions).length > 0 && (
+                                <View style={styles.reactionsRow}>
+                                    {Object.entries(item.reactions).map(([emoji, users]) => users.length > 0 ? (
+                                        <AnimatedReaction key={emoji}>
+                                            <View style={[styles.reactionBadge, { backgroundColor: isDark ? '#1A1A1A' : '#F2F2F2' }]}>
+                                                <Text style={styles.reactionEmoji}>{emoji}</Text>
+                                                <Text style={[styles.reactionCount, { color: isDark ? '#FFF' : '#666' }]}>{users.length}</Text>
+                                            </View>
+                                        </AnimatedReaction>
+                                    ) : null)}
+                                </View>
+                            )}
+                        </View>
                     </View>
-                </View>
-            </TouchableOpacity>
+                </InteractableMessage>
+            </AnimatedMessageBubble>
         );
+    };
+
+    const handlePinMessage = async (msg) => {
+        try {
+            await pinMessage(community.id, msg.id, user.id);
+            Alert.alert('Success', 'Message pinned to top');
+            setShowActions(false);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to pin message');
+        }
+    };
+
+    const handleUnpinMessage = async () => {
+        try {
+            await unpinMessage(community.id, user.id);
+            // setPinnedMessage(null); // Socket will handle this
+        } catch (error) {
+            Alert.alert('Error', 'Failed to unpin message');
+        }
     };
 
     const typingList = Object.values(typingUsers);
 
+    // Initial load of pinned message from community prop or fetch usually happens in useEffect
+    // For now we assume community object has it if passed fresh, otherwise we might need to fetch it separately or update `loadMessages`
+    useEffect(() => {
+        if (community.pinned_message) {
+            setPinnedMessage(community.pinned_message);
+        }
+    }, [community]);
+
     return (
-        <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#FFF' }]}>
-            <LinearGradient
-                colors={isDark ? ['#05070A', '#000000'] : ['#F8FAFC', '#FFFFFF']}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Subtle Abstract Pattern Overlay */}
-            <View style={[StyleSheet.absoluteFill, { opacity: isDark ? 0.04 : 0.02, overflow: 'hidden' }]}>
-                <Sparkles size={240} color={isDark ? "#FFF" : "#000"} style={{ position: 'absolute', top: -60, right: -80, transform: [{ rotate: '15deg' }] }} />
-                <Zap size={180} color={isDark ? "#FFF" : "#000"} style={{ position: 'absolute', bottom: 120, left: -50, transform: [{ rotate: '-20deg' }] }} />
-                <Sparkles size={120} color={isDark ? "#FFF" : "#000"} style={{ position: 'absolute', top: '40%', left: '10%', transform: [{ rotate: '45deg' }] }} />
-            </View>
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Background elements removed for Organic Earth style */}
             <SafeAreaView edges={['top']} style={styles.headerContainer}>
                 <View style={[styles.header, { borderBottomColor: isDark ? '#1A1A1A' : '#F2F2F2' }]}>
                     <TouchableOpacity onPress={onBack} style={styles.backBtn}>
                         <ChevronRight color={isDark ? "#FFF" : "#000"} size={28} style={{ transform: [{ rotate: '180deg' }] }} />
                     </TouchableOpacity>
                     <View style={styles.headerInfo}>
-                        <Text style={[styles.headerTitle, { color: isDark ? '#FFF' : '#000' }]}>{community.name}</Text>
-                        <Text style={styles.headerSubtitle}>Community Lounge</Text>
+                        <Text style={[styles.headerTitle, {
+                            color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                            fontFamily: 'PlayfairDisplay-Bold'
+                        }]}>{community.name}</Text>
+                        <Text style={[styles.headerSubtitle, { color: themeColors.accentPrimary }]}>Community Lounge</Text>
                     </View>
                     <TouchableOpacity style={styles.headerAction}>
                         <Users color={isDark ? "#FFF" : "#000"} size={22} />
                     </TouchableOpacity>
                 </View>
+
+                {/* Pinned Message Header */}
+                {pinnedMessage && (
+                    <View style={[styles.pinnedContainer, { backgroundColor: isDark ? 'rgba(60, 178, 226, 0.15)' : 'rgba(60, 178, 226, 0.1)' }]}>
+                        <Pin size={14} color={themeColors.accentPrimary} style={{ marginRight: 8 }} />
+                        <View style={{ flex: 1 }}>
+                            <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: 'bold', color: themeColors.accentPrimary }}>
+                                Pinned Message
+                            </Text>
+                            <Text numberOfLines={1} style={{ fontSize: 12, color: isDark ? themeColors.textMain : themeColors.textMainLight, opacity: 0.8 }}>
+                                {pinnedMessage.senderName}: {pinnedMessage.content}
+                            </Text>
+                        </View>
+                        {user.role === 'admin' /* simplified check */ && ( // In real app check community_members role
+                            <TouchableOpacity onPress={handleUnpinMessage} style={{ padding: 4 }}>
+                                <X size={14} color={isDark ? themeColors.textDim : themeColors.textDimLight} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
             </SafeAreaView>
 
             <KeyboardAvoidingView
@@ -365,7 +685,7 @@ export default function LoungeScreen({ user, community, onBack }) {
                             <ActivityIndicator size="small" color="#3CB2E2" style={{ marginTop: 20 }} />
                         ) : (
                             <View style={styles.emptyContainer}>
-                                <Text style={styles.emptyText}>Tap to chat with the community</Text>
+                                <Text style={[styles.emptyText, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>Tap to chat with the community</Text>
                             </View>
                         )
                     }
@@ -373,12 +693,47 @@ export default function LoungeScreen({ user, community, onBack }) {
 
                 {/* Typing Indicator */}
                 {typingList.length > 0 && (
-                    <View style={styles.typingContainer}>
-                        <Text style={styles.typingText}>
-                            {typingList.length === 1
-                                ? `${typingList[0]} is typing...`
-                                : `${typingList[0]} and ${typingList.length - 1} others are typing...`}
-                        </Text>
+                    <AnimatedTypingIndicator
+                        isDark={isDark}
+                        text={typingList.length === 1
+                            ? `${typingList[0]} is typing...`
+                            : `${typingList[0]} and ${typingList.length - 1} others are typing...`}
+                    />
+                )}
+
+                {/* Mention List Popup */}
+                {mentionQuery !== null && filteredMembers.length > 0 && (
+                    <View style={[styles.mentionList, { backgroundColor: isDark ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.95)' }]}>
+                        <FlatList
+                            data={filteredMembers}
+                            keyExtractor={(item, index) => index.toString()}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={[styles.mentionItem, { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+                                    onPress={() => handleMentionSelect(item.name || item.username)}
+                                >
+                                    <Text style={[styles.mentionText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>@{item.name || item.username}</Text>
+                                </TouchableOpacity>
+                            )}
+                        />
+                    </View>
+                )}
+
+                {/* Mention List Popup */}
+                {mentionQuery !== null && filteredMembers.length > 0 && (
+                    <View style={[styles.mentionList, { backgroundColor: isDark ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.95)' }]}>
+                        <FlatList
+                            data={filteredMembers}
+                            keyExtractor={(item, index) => index.toString()}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={[styles.mentionItem, { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
+                                    onPress={() => handleMentionSelect(item.name || item.username)}
+                                >
+                                    <Text style={[styles.mentionText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>@{item.name || item.username}</Text>
+                                </TouchableOpacity>
+                            )}
+                        />
                     </View>
                 )}
 
@@ -397,19 +752,23 @@ export default function LoungeScreen({ user, community, onBack }) {
                 )}
 
                 <View style={styles.footer}>
-                    <View style={[styles.inputContainer, { backgroundColor: isDark ? '#1A1A1A' : '#F2F2F2' }]}>
+                    <View style={[styles.inputContainer, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]}>
                         <TouchableOpacity style={styles.utilityBtn} onPress={() => setShowPollCreator(true)}>
-                            <BarChart2 color="#3CB2E2" size={24} />
+                            <BarChart2 color={themeColors.accentPrimary} size={24} />
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.utilityBtn}>
-                            <Camera color={isDark ? "#FFF" : "#666"} size={24} />
+                        <TouchableOpacity style={styles.utilityBtn} onPress={handleTakePhoto}>
+                            <Camera color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={24} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.utilityBtn} onPress={handlePickMedia}>
+                            <ImageIcon color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={24} />
                         </TouchableOpacity>
 
                         <TextInput
-                            style={[styles.input, { color: isDark ? '#FFF' : '#000' }]}
+                            style={[styles.input, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}
                             placeholder="Send a Chat"
-                            placeholderTextColor={isDark ? "#666" : "#999"}
+                            placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
                             value={newMessage}
                             onChangeText={handleTextChange}
                             multiline
@@ -418,17 +777,17 @@ export default function LoungeScreen({ user, community, onBack }) {
                         <View style={styles.rightActions}>
                             {newMessage.trim() ? (
                                 <TouchableOpacity onPress={handleSend} style={styles.sendBtn}>
-                                    <View style={styles.sendCircle}>
+                                    <View style={[styles.sendCircle, { backgroundColor: themeColors.accentPrimary }]}>
                                         <Send color="#FFF" size={16} />
                                     </View>
                                 </TouchableOpacity>
                             ) : (
                                 <>
                                     <TouchableOpacity style={styles.utilityBtn}>
-                                        <Mic color={isDark ? "#FFF" : "#666"} size={24} />
+                                        <Mic color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={24} />
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.utilityBtn}>
-                                        <ImageIcon color={isDark ? "#FFF" : "#666"} size={24} />
+                                        <ImageIcon color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={24} />
                                     </TouchableOpacity>
                                 </>
                             )}
@@ -560,6 +919,12 @@ export default function LoungeScreen({ user, community, onBack }) {
                                 <Text style={[styles.menuItemText, { color: isDark ? '#FFF' : '#333' }]}>Save to Collection</Text>
                             </TouchableOpacity>
 
+                            {(user.role === 'Chat Moderator' || community.created_by === user.id || user.role === 'admin' /* fallback */) && (
+                                <TouchableOpacity style={styles.menuItem} onPress={() => handlePinMessage(selectedMessage)}>
+                                    <Pin size={22} color="#FFA000" />
+                                    <Text style={[styles.menuItemText, { color: isDark ? '#FFF' : '#333' }]}>Pin Message</Text>
+                                </TouchableOpacity>
+                            )}
                             {selectedMessage?.senderId === user.id && (
                                 <TouchableOpacity style={styles.menuItem} onPress={() => handleDelete(selectedMessage.id)}>
                                     <Trash2 size={22} color="#F44336" />
@@ -887,14 +1252,47 @@ const styles = StyleSheet.create({
     removeOption: {
         padding: 10,
     },
-    addOptionBtn: {
+    pollFooter: {
+        marginTop: 10,
+        fontSize: 12,
+        color: '#999',
+        textAlign: 'right',
+    },
+    mentionList: {
+        position: 'absolute',
+        bottom: 80,
+        left: 20,
+        right: 20,
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        borderRadius: 12,
+        maxHeight: 150,
+        padding: 5,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 10,
+        zIndex: 1000,
+    },
+    mentionItem: {
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+    },
+    mentionText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    pinnedContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 10,
-        marginBottom: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
     },
     addOptionText: {
-        color: '#3CB2E2',
+        fontSize: 14,
         fontWeight: '800',
         marginLeft: 8,
     },
@@ -909,5 +1307,15 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 17,
         fontWeight: '800',
-    }
+    },
+    mediaMessageContainer: {
+        marginTop: 4,
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    messageImage: {
+        width: 240,
+        height: 180,
+        borderRadius: 12,
+    },
 });

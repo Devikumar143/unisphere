@@ -96,7 +96,7 @@ router.get('/group/:communityId', async (req, res) => {
         const sql = `
             SELECT cm.id, cm.sender_id, cm.message, cm.reactions, cm.sent_at, 
                    cm.read_at, cm.delivered_at, cm.reply_to_message_id, cm.message_type,
-                   cm.voice_url, cm.voice_duration, cm.is_deleted, cm.poll_data,
+                   cm.voice_url, cm.voice_duration, cm.is_deleted, cm.poll_data, cm.attachment_urls,
                    u.full_name as sender_name,
                    (SELECT message FROM chat_messages WHERE id = cm.reply_to_message_id) as reply_to_content,
                    (SELECT u2.full_name FROM chat_messages cm2 JOIN users u2 ON u2.id = cm2.sender_id WHERE cm2.id = cm.reply_to_message_id) as reply_to_sender_name
@@ -125,6 +125,7 @@ router.get('/group/:communityId', async (req, res) => {
             pollData: row.poll_data,
             voiceUrl: row.voice_url,
             voiceDuration: row.voice_duration,
+            attachmentUrls: row.attachment_urls,
             isDeleted: row.is_deleted
         }));
 
@@ -143,7 +144,7 @@ router.get('/:userId/:otherUserId', async (req, res) => {
         const sql = `
             SELECT id, sender_id, recipient_id, message, reactions, sent_at, 
                    read_at, delivered_at, reply_to_message_id, message_type,
-                   voice_url, voice_duration, is_deleted
+                   voice_url, voice_duration, is_deleted, attachment_urls
             FROM chat_messages
             WHERE ((sender_id = $1 AND recipient_id = $2)
                OR (sender_id = $2 AND recipient_id = $1))
@@ -166,6 +167,7 @@ router.get('/:userId/:otherUserId', async (req, res) => {
             messageType: row.message_type,
             voiceUrl: row.voice_url,
             voiceDuration: row.voice_duration,
+            attachmentUrls: row.attachment_urls,
             isDeleted: row.is_deleted
         }));
 
@@ -231,8 +233,8 @@ router.post('/:messageId/forward', async (req, res) => {
 
         // Create forwarded message
         const insertSql = `
-            INSERT INTO chat_messages (sender_id, recipient_id, message, message_type, voice_url, voice_duration)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO chat_messages (sender_id, recipient_id, message, message_type, voice_url, voice_duration, attachment_urls)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
         `;
         const result = await query(insertSql, [
@@ -241,7 +243,8 @@ router.post('/:messageId/forward', async (req, res) => {
             originalMessage.message,
             originalMessage.message_type,
             originalMessage.voice_url,
-            originalMessage.voice_duration
+            originalMessage.voice_duration,
+            originalMessage.attachment_urls
         ]);
 
         res.json({ success: true, message: result.rows[0] });

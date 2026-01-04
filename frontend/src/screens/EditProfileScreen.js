@@ -72,18 +72,18 @@ export default function EditProfileScreen({ user, onBack, onUpdateSuccess }) {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
-            <LinearGradient
-                colors={[themeColors.bgDark, isDark ? '#0a0d1d' : '#F1F5F9']}
-                style={StyleSheet.absoluteFill}
-            />
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Background elements removed for Organic Earth style */}
 
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: themeColors.bgCard }]}>
-                        <ArrowLeft color={themeColors.textMain} size={24} />
+                    <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]}>
+                        <ArrowLeft color={isDark ? themeColors.textMain : themeColors.textMainLight} size={24} />
                     </TouchableOpacity>
-                    <Text style={[styles.title, { color: themeColors.textMain }]}>Edit Profile</Text>
+                    <Text style={[styles.title, {
+                        color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                        fontFamily: 'PlayfairDisplay-Bold'
+                    }]}>Edit Profile</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
@@ -93,17 +93,21 @@ export default function EditProfileScreen({ user, onBack, onUpdateSuccess }) {
                             {avatar ? (
                                 <Image source={{ uri: avatar }} style={styles.avatar} />
                             ) : (
-                                <View style={[styles.avatar, { backgroundColor: themeColors.bgCard, justifyContent: 'center', alignItems: 'center' }]}>
-                                    <User size={40} color={themeColors.textMuted} />
+                                <View style={[styles.avatar, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, justifyContent: 'center', alignItems: 'center' }]}>
+                                    <User size={40} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
                                 </View>
                             )}
-                            <View style={[styles.editBadge, { backgroundColor: themeColors.accentPrimary }]}>
+                            <View style={[styles.editBadge, { backgroundColor: themeColors.accentPrimary, borderColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
                                 <Camera size={14} color="white" />
                             </View>
                         </TouchableOpacity>
                     </View>
 
-                    <BlurView intensity={GLASS.intensity} tint={isDark ? "dark" : "light"} style={[styles.card, { borderColor: themeColors.border, backgroundColor: themeColors.bgCard }]}>
+                    <View style={[styles.card, {
+                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                        borderColor: themeColors.accentPrimary + '15',
+                        borderWidth: 1
+                    }]}>
 
                         <InputGroup
                             label="Full Name"
@@ -111,6 +115,7 @@ export default function EditProfileScreen({ user, onBack, onUpdateSuccess }) {
                             value={formData.name}
                             onChangeText={(t) => setFormData({ ...formData, name: t })}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
 
                         <InputGroup
@@ -119,6 +124,7 @@ export default function EditProfileScreen({ user, onBack, onUpdateSuccess }) {
                             value={formData.username}
                             onChangeText={(t) => setFormData({ ...formData, username: t })}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
 
                         <InputGroup
@@ -127,6 +133,7 @@ export default function EditProfileScreen({ user, onBack, onUpdateSuccess }) {
                             value={formData.department}
                             onChangeText={(t) => setFormData({ ...formData, department: t })}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
 
                         <InputGroup
@@ -135,6 +142,7 @@ export default function EditProfileScreen({ user, onBack, onUpdateSuccess }) {
                             value={formData.location}
                             onChangeText={(t) => setFormData({ ...formData, location: t })}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
 
                         <InputGroup
@@ -144,17 +152,17 @@ export default function EditProfileScreen({ user, onBack, onUpdateSuccess }) {
                             onChangeText={(t) => setFormData({ ...formData, bio: t })}
                             multiline
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
 
-                    </BlurView>
+                    </View>
 
-                    <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading}>
-                        <LinearGradient
-                            colors={[themeColors.accentPrimary, themeColors.accentSecondary]}
-                            style={styles.saveGradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                        >
+                    <TouchableOpacity
+                        style={[styles.saveBtn, { backgroundColor: themeColors.accentPrimary }]}
+                        onPress={handleSave}
+                        disabled={loading}
+                    >
+                        <View style={styles.saveGradient}>
                             {loading ? (
                                 <ActivityIndicator color="white" />
                             ) : (
@@ -163,7 +171,7 @@ export default function EditProfileScreen({ user, onBack, onUpdateSuccess }) {
                                     <Text style={styles.saveText}>Save Changes</Text>
                                 </>
                             )}
-                        </LinearGradient>
+                        </View>
                     </TouchableOpacity>
 
                 </ScrollView>
@@ -172,16 +180,16 @@ export default function EditProfileScreen({ user, onBack, onUpdateSuccess }) {
     );
 }
 
-const InputGroup = ({ label, icon: Icon, value, onChangeText, multiline, themeColors = COLORS }) => (
+const InputGroup = ({ label, icon: Icon, value, onChangeText, multiline, themeColors, isDark }) => (
     <View style={styles.inputGroup}>
-        <Text style={[styles.label, { color: themeColors.textMuted }]}>{label}</Text>
-        <View style={[styles.inputContainer, multiline && { height: 100, alignItems: 'flex-start' }, { backgroundColor: themeColors.bgDark, borderColor: themeColors.border }]}>
+        <Text style={[styles.label, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>{label}</Text>
+        <View style={[styles.inputContainer, multiline && { height: 100, alignItems: 'flex-start' }, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight, borderColor: themeColors.accentPrimary + '10' }]}>
             <Icon color={themeColors.accentPrimary} size={20} style={{ marginTop: multiline ? 12 : 0 }} />
             <TextInput
-                style={[styles.input, multiline && { height: '100%', paddingTop: 12 }, { color: themeColors.textMain }]}
+                style={[styles.input, multiline && { height: '100%', paddingTop: 12 }, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}
                 value={value}
                 onChangeText={onChangeText}
-                placeholderTextColor={themeColors.textDim}
+                placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
                 placeholder={`Enter ${label}`}
                 multiline={multiline}
                 textAlignVertical={multiline ? 'top' : 'center'}

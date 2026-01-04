@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
 const PRODUCTION_SOCKET_URL = 'https://unisphere-api.onrender.com';
-const DEVELOPMENT_SOCKET_URL = 'http://10.144.108.250:5001';
+const DEVELOPMENT_SOCKET_URL = 'http://10.218.116.250:5001';
 
 // __DEV__ is true during local development, false in production builds
 const SOCKET_URL = __DEV__ ? DEVELOPMENT_SOCKET_URL : PRODUCTION_SOCKET_URL;
@@ -37,8 +37,8 @@ export const disconnectSocket = () => {
     }
 };
 
-export const sendMessage = (senderId, recipientId, content, replyToMessageId = null, encrypted = false, messageType = 'text', voiceUrl = null, voiceDuration = null) => {
-    console.log('Sending message:', { senderId, recipientId, content, replyToMessageId, encrypted, messageType });
+export const sendMessage = (senderId, recipientId, content, replyToMessageId = null, encrypted = false, messageType = 'text', voiceUrl = null, voiceDuration = null, attachmentUrls = []) => {
+    console.log('Sending message:', { senderId, recipientId, content, replyToMessageId, encrypted, messageType, attachmentUrls });
     if (socket) {
         socket.emit('send_message', {
             senderId,
@@ -48,7 +48,8 @@ export const sendMessage = (senderId, recipientId, content, replyToMessageId = n
             encrypted,
             messageType,
             voiceUrl,
-            voiceDuration
+            voiceDuration,
+            attachmentUrls
         });
     } else {
         console.error('Socket not connected!');

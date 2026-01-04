@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Switch, ScrollView } from 're
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { ArrowLeft, Bell, Lock, Moon, LogOut, ChevronRight, User, Instagram, Mail } from 'lucide-react-native';
-import { COLORS, SIZES, GLASS } from '../constants/theme';
+import { COLORS, SIZES } from '../constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 
@@ -18,81 +18,96 @@ export default function SettingsScreen({ onBack, onLogout, onEditProfile }) {
     const [notifications, setNotifications] = useState(true);
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
-            <LinearGradient
-                colors={[themeColors.bgDark, isDark ? '#0a0d1d' : '#E2E8F0']}
-                style={StyleSheet.absoluteFill}
-            />
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Background elements removed for Organic Earth style */}
 
             <SafeAreaView style={styles.safeArea}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: themeColors.bgCard }]}>
-                        <ArrowLeft color={themeColors.textMain} size={24} />
+                    <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]}>
+                        <ArrowLeft color={isDark ? themeColors.textMain : themeColors.textMainLight} size={24} />
                     </TouchableOpacity>
-                    <Text style={[styles.title, { color: themeColors.textMain }]}>Settings</Text>
+                    <Text style={[styles.title, {
+                        color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                        fontFamily: 'PlayfairDisplay-Bold'
+                    }]}>Settings</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
                 <ScrollView contentContainerStyle={styles.content}>
 
                     {/* Account Section */}
-                    <Text style={[styles.sectionTitle, { color: themeColors.textDim }]}>Account</Text>
-                    <BlurView intensity={GLASS.intensity} tint={isDark ? "dark" : "light"} style={[styles.card, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.6)', borderColor: themeColors.border }]}>
+                    <Text style={[styles.sectionTitle, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Account</Text>
+                    <View style={[styles.card, {
+                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                        borderColor: themeColors.accentPrimary + '15'
+                    }]}>
                         <SettingItem
                             icon={User}
                             label="Edit Profile"
                             onPress={onEditProfile}
                             showArrow
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
-                        <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
+                        <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]} />
                         <SettingItem
                             icon={Lock}
                             label="Privacy & Security"
                             onPress={() => { }}
                             showArrow
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
-                    </BlurView>
+                    </View>
 
                     {/* Preferences Section */}
-                    <Text style={[styles.sectionTitle, { color: themeColors.textDim }]}>Preferences</Text>
-                    <BlurView intensity={GLASS.intensity} tint={isDark ? "dark" : "light"} style={[styles.card, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.6)', borderColor: themeColors.border }]}>
+                    <Text style={[styles.sectionTitle, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Preferences</Text>
+                    <View style={[styles.card, {
+                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                        borderColor: themeColors.accentPrimary + '15'
+                    }]}>
                         <SettingToggle
                             icon={Bell}
                             label="Notifications"
                             value={notifications}
                             onValueChange={setNotifications}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
-                        <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
+                        <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]} />
                         <SettingToggle
                             icon={Moon}
                             label="Dark Mode"
                             value={isDark}
                             onValueChange={toggleTheme}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
-                    </BlurView>
+                    </View>
 
                     {/* Developer Details */}
-                    <Text style={[styles.sectionTitle, { color: themeColors.textDim }]}>Developer</Text>
-                    <BlurView intensity={GLASS.intensity} tint={isDark ? "dark" : "light"} style={[styles.card, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.6)', borderColor: themeColors.border }]}>
+                    <Text style={[styles.sectionTitle, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Developer</Text>
+                    <View style={[styles.card, {
+                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                        borderColor: themeColors.accentPrimary + '15'
+                    }]}>
                         <SettingItem
                             icon={Instagram}
                             label="Instagram: devi_._kumar"
                             onPress={() => { }}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
-                        <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
+                        <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]} />
                         <SettingItem
                             icon={Mail}
                             label="Email: anegondhikumar2@gmail.com"
                             onPress={() => { }}
                             themeColors={themeColors}
+                            isDark={isDark}
                         />
-                    </BlurView>
+                    </View>
 
                     {/* Actions */}
                     <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
@@ -108,28 +123,28 @@ export default function SettingsScreen({ onBack, onLogout, onEditProfile }) {
     );
 }
 
-const SettingItem = ({ icon: Icon, label, onPress, showArrow, themeColors = COLORS }) => (
+const SettingItem = ({ icon: Icon, label, onPress, showArrow, themeColors, isDark }) => (
     <TouchableOpacity style={styles.item} onPress={onPress}>
         <View style={styles.itemLeft}>
-            <View style={[styles.iconBox, { backgroundColor: themeColors.bgCard }]}>
-                <Icon color={themeColors.textDim} size={20} />
+            <View style={[styles.iconBox, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+                <Icon color={themeColors.accentPrimary} size={20} />
             </View>
-            <Text style={[styles.itemLabel, { color: themeColors.textMain }]}>{label}</Text>
+            <Text style={[styles.itemLabel, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{label}</Text>
         </View>
-        {showArrow && <ChevronRight color={themeColors.textDim} size={20} />}
+        {showArrow && <ChevronRight color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={20} />}
     </TouchableOpacity>
 );
 
-const SettingToggle = ({ icon: Icon, label, value, onValueChange, themeColors = COLORS }) => (
+const SettingToggle = ({ icon: Icon, label, value, onValueChange, themeColors, isDark }) => (
     <View style={styles.item}>
         <View style={styles.itemLeft}>
-            <View style={[styles.iconBox, { backgroundColor: themeColors.bgCard }]}>
-                <Icon color={themeColors.textDim} size={20} />
+            <View style={[styles.iconBox, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+                <Icon color={themeColors.accentPrimary} size={20} />
             </View>
-            <Text style={[styles.itemLabel, { color: themeColors.textMain }]}>{label}</Text>
+            <Text style={[styles.itemLabel, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{label}</Text>
         </View>
         <Switch
-            trackColor={{ false: '#333', true: themeColors.accentPrimary }}
+            trackColor={{ false: isDark ? '#333' : '#DDD', true: themeColors.accentPrimary }}
             thumbColor={'#fff'}
             onValueChange={onValueChange}
             value={value}

@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 const PRODUCTION_URL = 'https://unisphere-api.onrender.com/api';
 const DEVELOPMENT_URL = Platform.OS === 'web'
     ? 'http://localhost:5001/api'
-    : 'http://10.144.108.250:5001/api';
+    : 'http://10.218.116.250:5001/api';
 
 // --- Dynamic API Switch ---
 // __DEV__ is true when running npx expo start, false when running in a production build
@@ -141,9 +141,9 @@ export const uploadUserAvatar = async (userId, imageUri) => {
         const type = match ? `image/${match[1]}` : 'image/jpeg';
 
         formData.append('avatar', {
-            uri: imageUri,
-            name: filename,
-            type: type,
+            uri: Platform.OS === 'android' ? imageUri : imageUri.replace('file://', ''),
+            name: filename || 'avatar.jpg',
+            type: type || 'image/jpeg',
         });
 
         const response = await fetch(`${API_URL}/users/${userId}/avatar`, {
@@ -156,7 +156,7 @@ export const uploadUserAvatar = async (userId, imageUri) => {
         if (!response.ok) throw new Error(data.error || 'Failed to upload avatar');
         return data.avatar;
     } catch (error) {
-        console.error('Upload Avatar Error:', error);
+        console.error('[API] Upload Avatar Error:', error);
         throw error;
     }
 };
@@ -179,6 +179,7 @@ export const updateUserProfile = async (userId, updates) => {
 
 // Image Upload
 export const uploadImage = async (imageUri) => {
+    console.log(`[API] Uploading image from: ${imageUri}`);
     try {
         const formData = new FormData();
         const filename = imageUri.split('/').pop();
@@ -186,9 +187,9 @@ export const uploadImage = async (imageUri) => {
         const type = match ? `image/${match[1]}` : `image`;
 
         formData.append('image', {
-            uri: imageUri,
-            name: filename,
-            type: type
+            uri: Platform.OS === 'android' ? imageUri : imageUri.replace('file://', ''),
+            name: filename || 'image.jpg',
+            type: type || 'image/jpeg'
         });
 
         const response = await fetch(`${API_URL}/posts/upload-image`, {
@@ -196,15 +197,15 @@ export const uploadImage = async (imageUri) => {
             body: formData,
             headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'multipart/form-data',
             },
         });
 
         const data = await response.json();
+        console.log(`[API] Upload result:`, data);
         if (!response.ok) throw new Error(data.error || 'Upload failed');
         return data.imageUrl; // Returns the public URL
     } catch (error) {
-        console.error('Error uploading image:', error);
+        console.error('[API] Error uploading image:', error);
         throw error;
     }
 };
@@ -576,8 +577,8 @@ export const uploadFile = async (uri) => {
         }
 
         formData.append('file', {
-            uri,
-            name: filename,
+            uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+            name: filename || 'file',
             type
         });
 
@@ -653,6 +654,36 @@ export const deleteAd = async (id) => {
     }
 };
 
+// Pin Message
+export const pinMessage = async (communityId, messageId, userId) => {
+    try {
+        const response = await fetch(`${API_URL}/communities/${communityId}/pin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messageId, userId }),
+        });
+        const data = await response.json();
+        return data; // { success: true, pinnedMessage: {...} }
+    } catch (error) {
+        console.error("Failed to pin message:", error);
+    }
+};
+
+// Unpin Message
+export const unpinMessage = async (communityId, userId) => {
+    try {
+        const response = await fetch(`${API_URL}/communities/${communityId}/unpin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Failed to unpin message:", error);
+    }
+};
+
 // Push Notifications
 export const updatePushToken = async (userId, token) => {
     try {
@@ -667,5 +698,21 @@ export const updatePushToken = async (userId, token) => {
         return data;
     } catch (error) {
         console.error("Failed to update push token:", error);
+    }
+};
+
+export const fetchLinkMetadata = async (url) => {
+    try {
+        const response = await fetch(`${API_URL}/metadata`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch metadata');
+        return data; // { title, description, image, url }
+    } catch (error) {
+        console.error('Fetch Metadata Error:', error);
+        return null; // Return null gracefully on failure
     }
 };

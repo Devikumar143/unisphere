@@ -148,17 +148,8 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
-            <LinearGradient
-                colors={isDark ? ['#050810', '#000000'] : ['#F8FAFC', '#FFFFFF']}
-                style={StyleSheet.absoluteFill}
-            />
-
-            {/* Background Glows */}
-            <View style={StyleSheet.absoluteFill}>
-                <View style={[styles.glowCircle, { top: -100, right: -100, backgroundColor: isDark ? '#3CB2E220' : '#3CB2E210' }]} />
-                <View style={[styles.glowCircle, { bottom: -100, left: -100, backgroundColor: isDark ? '#9C27B015' : '#9C27B005' }]} />
-            </View>
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Background Glows removed for Organic Earth style */}
 
             <SafeAreaView edges={['top']} style={styles.safeArea}>
                 <ScrollView
@@ -170,10 +161,13 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
                     <View style={styles.header}>
                         <View style={styles.headerTop}>
                             <View>
-                                <Text style={[styles.headerTitle, { color: themeColors.textMain }]}>Discover</Text>
-                                <Text style={[styles.headerSubtitle, { color: themeColors.textDim }]}>Explore the UniSphere</Text>
+                                <Text style={[styles.headerTitle, {
+                                    color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                    fontFamily: 'PlayfairDisplay-Bold'
+                                }]}>Discover</Text>
+                                <Text style={[styles.headerSubtitle, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Explore the UniSphere</Text>
                             </View>
-                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]}>
                                 <Sparkles color={themeColors.accentPrimary} size={20} />
                             </TouchableOpacity>
                         </View>
@@ -181,28 +175,31 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
 
                     {/* Search Bar (Sticky) */}
                     <View style={styles.searchWrapper}>
-                        <BlurView intensity={isDark ? 30 : 80} tint={isDark ? "dark" : "light"} style={styles.searchBlur}>
-                            <View style={[styles.searchBar, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-                                <Search color={themeColors.textDim} size={20} />
-                                <TextInput
-                                    style={[styles.input, { color: themeColors.textMain }]}
-                                    placeholder="Search people, tags, clubs..."
-                                    placeholderTextColor={themeColors.textDim}
-                                    value={query}
-                                    onChangeText={setQuery}
-                                    autoCapitalize="none"
-                                />
-                                {query.length > 0 ? (
-                                    <TouchableOpacity onPress={clearSearch}>
-                                        <X color={themeColors.textDim} size={20} />
-                                    </TouchableOpacity>
-                                ) : (
-                                    <TouchableOpacity>
-                                        <Filter color={themeColors.textDim} size={18} />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </BlurView>
+                        <View style={[styles.searchBar, {
+                            backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                            borderColor: themeColors.accentPrimary + '15',
+                            borderWidth: 1,
+                            borderRadius: 24
+                        }]}>
+                            <Search color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={20} />
+                            <TextInput
+                                style={[styles.input, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}
+                                placeholder="Search people, tags, clubs..."
+                                placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
+                                value={query}
+                                onChangeText={setQuery}
+                                autoCapitalize="none"
+                            />
+                            {query.length > 0 ? (
+                                <TouchableOpacity onPress={clearSearch}>
+                                    <X color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={20} />
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity>
+                                    <Filter color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={18} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
 
                         {/* Filter Tabs */}
                         <ScrollView
@@ -217,12 +214,13 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
                                     onPress={() => setSelectedFilter(filter)}
                                     style={[
                                         styles.filterPill,
+                                        { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight },
                                         selectedFilter === filter && { backgroundColor: themeColors.accentPrimary }
                                     ]}
                                 >
                                     <Text style={[
                                         styles.filterText,
-                                        { color: selectedFilter === filter ? '#FFF' : themeColors.textDim }
+                                        { color: selectedFilter === filter ? '#FFF' : (isDark ? themeColors.textMuted : themeColors.textMutedLight) }
                                     ]}>
                                         {filter}
                                     </Text>
@@ -252,23 +250,26 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
                                 <>
                                     {communityResults.length > 0 && (
                                         <View style={styles.resultSection}>
-                                            <Text style={[styles.resultSectionTitle, { color: themeColors.textDim }]}>COMMUNITIES ({communityResults.length})</Text>
+                                            <Text style={[styles.resultSectionTitle, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>COMMUNITIES ({communityResults.length})</Text>
                                             {communityResults.map(item => (
                                                 <TouchableOpacity
                                                     key={`res-comm-${item.id}`}
                                                     onPress={() => onOpenCommunity && onOpenCommunity(item)}
                                                     style={styles.communityResultCard}
                                                 >
-                                                    <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={styles.communityResultInner}>
+                                                    <View style={[styles.communityResultInner, {
+                                                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                                                        borderColor: themeColors.accentPrimary + '10'
+                                                    }]}>
                                                         <Image source={{ uri: item.icon || `https://picsum.photos/seed/${item.id}/100` }} style={styles.communityResultIcon} />
                                                         <View style={styles.communityResultInfo}>
-                                                            <Text style={[styles.communityResultName, { color: themeColors.textMain }]}>{item.name}</Text>
-                                                            <Text style={[styles.communityResultMeta, { color: themeColors.textDim }]}>{item.member_count} members • {item.type}</Text>
+                                                            <Text style={[styles.communityResultName, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{item.name}</Text>
+                                                            <Text style={[styles.communityResultMeta, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>{item.member_count} members • {item.type}</Text>
                                                         </View>
-                                                        <TouchableOpacity style={styles.joinBtnSmall}>
+                                                        <TouchableOpacity style={[styles.joinBtnSmall, { backgroundColor: themeColors.accentPrimary }]}>
                                                             <Text style={styles.joinBtnText}>Join</Text>
                                                         </TouchableOpacity>
-                                                    </BlurView>
+                                                    </View>
                                                 </TouchableOpacity>
                                             ))}
                                         </View>
@@ -276,7 +277,7 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
 
                                     {results.length > 0 && (
                                         <View style={styles.resultSection}>
-                                            <Text style={[styles.resultSectionTitle, { color: themeColors.textDim }]}>PEOPLE ({results.length})</Text>
+                                            <Text style={[styles.resultSectionTitle, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>PEOPLE ({results.length})</Text>
                                             {results.map(item => (
                                                 <UserListItem
                                                     key={`res-user-${item.id}`}
@@ -289,7 +290,7 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
 
                                     {results.length === 0 && communityResults.length === 0 && !loading && (
                                         <View style={styles.emptyContainer}>
-                                            <Text style={[styles.emptyText, { color: themeColors.textDim }]}>No results for "{query}" in {selectedFilter}</Text>
+                                            <Text style={[styles.emptyText, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>No results for "{query}" in {selectedFilter}</Text>
                                         </View>
                                     )}
                                 </>
@@ -307,7 +308,7 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
                                     {/* Trending Section */}
                                     <View style={styles.sectionHeader}>
                                         <TrendingUp size={18} color={themeColors.accentPrimary} />
-                                        <Text style={[styles.sectionTitle, { color: themeColors.textMain }]}>Trending Communities</Text>
+                                        <Text style={[styles.sectionTitle, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Trending Communities</Text>
                                     </View>
 
                                     <FlatList
@@ -334,7 +335,7 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
                                     {/* Masonry Discover Grid */}
                                     <View style={styles.sectionHeader}>
                                         <Sparkles size={18} color={themeColors.accentPrimary} />
-                                        <Text style={[styles.sectionTitle, { color: themeColors.textMain }]}>Suggested For You</Text>
+                                        <Text style={[styles.sectionTitle, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Suggested For You</Text>
                                     </View>
                                     {renderDiscoverGrid()}
                                 </>

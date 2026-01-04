@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, Image, TouchableOpacity, Modal, TextInput, Flat
 import { BlurView } from 'expo-blur';
 import { Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Trash, AlertTriangle, Clock, User, CheckCircle2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, GLASS, SIZES } from '../constants/theme';
+import { COLORS, GLASS, SIZES, SHADOWS } from '../constants/theme';
 import { likePost, fetchComments, addComment } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 
@@ -138,47 +138,38 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                         {user.avatar ? (
                             <Image source={{ uri: user.avatar }} style={styles.avatar} />
                         ) : (
-                            <View style={[styles.avatar, { backgroundColor: '#2A2A2A', justifyContent: 'center', alignItems: 'center' }]}>
-                                <User size={20} color={themeColors.textDim} />
+                            <View style={[styles.avatar, { backgroundColor: isDark ? themeColors.bgDark : themeColors.sand, justifyContent: 'center', alignItems: 'center' }]}>
+                                <User size={20} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
                             </View>
                         )}
-                        {/* Status Check or Role could go here */}
                     </View>
                     <View style={styles.userText}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={[styles.userName, { color: themeColors.textMain }]}>
+                            <Text style={[styles.userName, {
+                                color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                fontFamily: 'PlayfairDisplay-Bold'
+                            }]}>
                                 {user.name || 'Anonymous user'}
                             </Text>
                             {user.role === 'admin' && <CheckCircle2 size={12} color={themeColors.accentPrimary} style={{ marginLeft: 4 }} />}
                         </View>
-                        <Text style={[styles.userRole, { color: themeColors.textDim }]}>
-                            {user.role ? user.role.toUpperCase() : 'MEMBER'} • {time}
+                        <Text style={[styles.userRole, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
+                            {user.role || 'Member'} • {time}
                         </Text>
                     </View>
                 </TouchableOpacity>
 
                 {/* More Options */}
                 {/* Delete Option (Owner Only) */}
-                {String(currentUser?.id) === String(user.id) && (
-                    <TouchableOpacity
-                        style={styles.moreBtn}
-                        onPress={() => setShowDeleteConfirm(true)}
-                    >
-                        <Trash size={20} color={themeColors.textDim} />
-                    </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                    style={styles.moreBtn}
+                    onPress={() => setShowDeleteConfirm(true)}
+                >
+                    <MoreHorizontal size={20} color={isDark ? themeColors.textDim : themeColors.textDimLight} />
+                </TouchableOpacity>
             </View>
 
-            {/* Content */}
-            {content ? (
-                <View style={styles.contentContainer}>
-                    <Text style={[styles.contentText, { color: themeColors.textMain }]}>
-                        {content}
-                    </Text>
-                </View>
-            ) : null}
-
-            {/* Media */}
+            {/* Media (Instagram Style - Middle) */}
             {image && (
                 <TouchableOpacity
                     activeOpacity={0.95}
@@ -195,49 +186,65 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                             transform: [{ scale: heartAnim }]
                         }
                     ]}>
-                        <BlurView intensity={20} tint="light" style={styles.heartBlur}>
-                            <Heart size={80} color={COLORS.error} fill={COLORS.error} />
-                        </BlurView>
+                        <View style={[styles.heartBlur, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                            <Heart size={80} color={themeColors.error} fill={themeColors.error} />
+                        </View>
                     </Animated.View>
                 </TouchableOpacity>
             )}
 
-            {/* Footer / Actions */}
-            <View style={[styles.footer, { borderTopColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
+            {/* Footer / Actions (Instagram Style - Below Media) */}
+            <View style={styles.footer}>
                 <View style={styles.actionRow}>
                     <View style={styles.leftActions}>
                         <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
                             <Heart
-                                size={26}
-                                color="#ef4444"
-                                fill={isLiked ? "#ef4444" : 'transparent'}
-                                strokeWidth={isLiked ? 0 : 2}
+                                size={28}
+                                color={isLiked ? themeColors.error : (isDark ? themeColors.textMain : themeColors.textMainLight)}
+                                fill={isLiked ? themeColors.error : 'transparent'}
                             />
-                            {likes > 0 && (
-                                <Text style={[styles.actionCount, { color: themeColors.textMain }]}>{likes}</Text>
-                            )}
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.actionBtn} onPress={handleOpenComments}>
-                            <MessageCircle size={26} color={themeColors.textMain} strokeWidth={2} />
-                            {commentsCount > 0 && (
-                                <Text style={[styles.actionCount, { color: themeColors.textMain }]}>{commentsCount}</Text>
-                            )}
+                            <MessageCircle size={28} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+                            <Share2 size={26} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
-                        <Share2 size={24} color={themeColors.textMain} strokeWidth={2} />
-                    </TouchableOpacity>
+                    {/* Save or other right action could go here */}
                 </View>
 
-
-                {/* Liked By Preview (Optional) */}
-                {likes > 0 && (
-                    <Text style={[styles.likedByText, { color: themeColors.textDim }]}>
-                        Liked by {likes} {likes === 1 ? 'person' : 'people'}
+                {/* Likes Counter */}
+                <TouchableOpacity activeOpacity={0.8}>
+                    <Text style={[styles.likesCountText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
+                        {likes.toLocaleString()} {likes === 1 ? 'like' : 'likes'}
                     </Text>
-                )}
+                </TouchableOpacity>
+
+                {/* Caption / Content (Instagram Style - Below Actions) */}
+                {content ? (
+                    <View style={styles.captionContainer}>
+                        <Text style={[styles.captionText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]} numberOfLines={3}>
+                            <Text style={styles.captionUser}>{user.name || 'User'} </Text>
+                            {content}
+                        </Text>
+                    </View>
+                ) : null}
+
+                {/* Comments Link */}
+                <TouchableOpacity onPress={handleOpenComments}>
+                    <Text style={[styles.viewCommentsLink, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>
+                        {commentsCount > 0 ? `View all ${commentsCount} comments` : 'Add a comment...'}
+                    </Text>
+                </TouchableOpacity>
+
+                {/* Timestamp */}
+                <Text style={[styles.timeAgo, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>
+                    {time.toUpperCase()}
+                </Text>
             </View>
 
             {/* Comments Modal */}
@@ -260,9 +267,9 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                         <View style={styles.modalHandle} />
 
                         <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: themeColors.textMain }]}>Comments</Text>
+                            <Text style={[styles.modalTitle, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Comments</Text>
                             <TouchableOpacity onPress={() => setShowComments(false)} style={styles.modalCloseBtn}>
-                                <X size={22} color={themeColors.textMain} />
+                                <X size={22} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
                             </TouchableOpacity>
                         </View>
 
@@ -278,10 +285,10 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                                             <User size={14} color="#ccc" />
                                         </View>
                                         <View style={styles.commentContent}>
-                                            <Text style={[styles.commentUser, { color: themeColors.textMain }]}>
+                                            <Text style={[styles.commentUser, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
                                                 {item.user_name || 'User'}
                                             </Text>
-                                            <Text style={[styles.commentText, { color: themeColors.textDim }]}>
+                                            <Text style={[styles.commentText, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>
                                                 {item.content}
                                             </Text>
                                         </View>
@@ -290,7 +297,7 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                                 contentContainerStyle={{ paddingBottom: 20 }}
                                 ListEmptyComponent={
                                     <View style={{ alignItems: 'center', marginTop: 50 }}>
-                                        <Text style={{ color: themeColors.textDim }}>No comments yet.</Text>
+                                        <Text style={{ color: isDark ? themeColors.textDim : themeColors.textDimLight }}>No comments yet.</Text>
                                         <Text style={{ color: themeColors.accentPrimary, marginTop: 8 }}>Be the first to comment!</Text>
                                     </View>
                                 }
@@ -300,17 +307,17 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                         <View style={[styles.inputContainer, { borderTopColor: themeColors.border, backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.5)' }]}>
                             <TextInput
                                 style={[styles.input, {
-                                    color: themeColors.textMain,
+                                    color: isDark ? themeColors.textMain : themeColors.textMainLight,
                                     backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'
                                 }]}
                                 placeholder="Add a comment..."
-                                placeholderTextColor={themeColors.textDim}
+                                placeholderTextColor={isDark ? themeColors.textDim : themeColors.textDimLight}
                                 value={newComment}
                                 onChangeText={setNewComment}
                             />
                             <TouchableOpacity onPress={handleSendComment} disabled={!newComment.trim()}>
                                 <View style={[styles.sendBtn, { backgroundColor: newComment.trim() ? themeColors.accentPrimary : 'transparent' }]}>
-                                    <Send size={18} color={newComment.trim() ? '#FFF' : themeColors.textDim} />
+                                    <Send size={18} color={newComment.trim() ? '#FFF' : (isDark ? themeColors.textDim : themeColors.textDimLight)} />
                                 </View>
                             </TouchableOpacity>
                         </View>
@@ -326,26 +333,29 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                 onRequestClose={() => setShowDeleteConfirm(false)}
             >
                 <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
-                    <BlurView intensity={40} tint="dark" style={[styles.confirmBox, { borderColor: 'rgba(255,255,255,0.1)' }]}>
-                        <AlertTriangle size={40} color={COLORS.error} style={{ marginBottom: 16 }} />
-                        <Text style={styles.confirmTitle}>Delete Post?</Text>
-                        <Text style={styles.confirmSubtitle}>Are you sure? This cannot be undone.</Text>
+                    <View style={[styles.confirmBox, {
+                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                        borderColor: themeColors.accentPrimary + '20'
+                    }]}>
+                        <AlertTriangle size={40} color={themeColors.error} style={{ marginBottom: 16 }} />
+                        <Text style={[styles.confirmTitle, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Delete Post?</Text>
+                        <Text style={[styles.confirmSubtitle, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Are you sure? This cannot be undone.</Text>
 
                         <View style={styles.confirmRow}>
                             <TouchableOpacity
-                                style={[styles.confirmBtn, { backgroundColor: 'rgba(255,255,255,0.1)' }]}
+                                style={[styles.confirmBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
                                 onPress={() => setShowDeleteConfirm(false)}
                             >
-                                <Text style={{ color: '#fff', fontWeight: '600' }}>Cancel</Text>
+                                <Text style={{ color: isDark ? '#fff' : '#000', fontWeight: '600' }}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.confirmBtn, { backgroundColor: COLORS.error }]}
+                                style={[styles.confirmBtn, { backgroundColor: themeColors.error }]}
                                 onPress={handleDelete}
                             >
                                 <Text style={{ color: '#fff', fontWeight: '600' }}>Delete</Text>
                             </TouchableOpacity>
                         </View>
-                    </BlurView>
+                    </View>
                 </View>
             </Modal>
         </View >
@@ -354,11 +364,9 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
 
 const styles = StyleSheet.create({
     card: {
-        marginBottom: 20,
-        marginHorizontal: 16,
-        borderRadius: 24,
-        overflow: 'hidden',
-        borderWidth: 1,
+        marginBottom: 30, // More breathing room
+        borderRadius: 0, // Insta feed posts are edge-to-edge usually, but we'll stick to slightly rounded for UniSphere
+        backgroundColor: 'transparent', // Let it blend with the main background
     },
     header: {
         flexDirection: 'row',
@@ -394,17 +402,9 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginTop: 2,
     },
-    contentContainer: {
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-    },
-    contentText: {
-        fontSize: 15,
-        lineHeight: 22,
-    },
     mediaContainer: {
         width: '100%',
-        aspectRatio: 4 / 5,
+        aspectRatio: 1, // Instagram square default
         backgroundColor: '#000',
         position: 'relative',
         justifyContent: 'center',
@@ -425,32 +425,49 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     footer: {
-        padding: 16,
+        paddingHorizontal: 16,
+        paddingBottom: 16,
         paddingTop: 12,
-        // borderTopWidth: 1, // Optional: clearer separation
     },
     actionRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 10,
     },
     leftActions: {
         flexDirection: 'row',
         gap: 16,
     },
     actionBtn: {
-        flexDirection: 'row',
+        justifyContent: 'center',
         alignItems: 'center',
-        gap: 6,
     },
-    actionCount: {
+    likesCountText: {
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '800',
+        marginBottom: 6,
     },
-    likedByText: {
-        fontSize: 13,
+    captionContainer: {
+        marginBottom: 6,
+    },
+    captionText: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    captionUser: {
+        fontWeight: '800',
+        fontFamily: 'PlayfairDisplay-Bold',
+    },
+    viewCommentsLink: {
+        fontSize: 14,
         fontWeight: '500',
+        marginBottom: 4,
+    },
+    timeAgo: {
+        fontSize: 10,
+        fontWeight: '600',
+        letterSpacing: 0.2,
     },
 
     // Comments Modal

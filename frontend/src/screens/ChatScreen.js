@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Modal, Pressable, Animated, Keyboard, Clipboard, Alert, Image } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Modal, Pressable, Animated, Keyboard, Clipboard, Alert, Image, TouchableWithoutFeedback } from 'react-native';
 import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
-import { ArrowLeft, Send, Camera, Plus, Check, CheckCheck, Copy, Trash2, Forward, Bookmark, BookmarkCheck, X, Mic, Play, Pause, Edit3, Lock, User } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { ArrowLeft, Send, Camera, Plus, Check, CheckCheck, Copy, Trash2, Forward, Bookmark, BookmarkCheck, X, Mic, Play, Pause, Edit3, Lock, User, Search, Image as ImageIcon, Gift } from 'lucide-react-native';
+import LinkPreviewCard from '../components/LinkPreviewCard';
+import GifPicker from '../components/GifPicker';
 import { COLORS, SIZES, GLASS } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import { fetchMessages, saveMessage, unsaveMessage, forwardMessage, uploadFile } from '../services/api';
@@ -42,7 +45,7 @@ import {
 } from '../services/socket';
 
 const AnimatedMessageBubble = ({ children, isReceived }) => {
-    const slideAnim = useRef(new Animated.Value(50)).current;
+    const slideAnim = useRef(new Animated.Value(isReceived ? 20 : 50)).current; // Less movement for received
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
@@ -50,18 +53,19 @@ const AnimatedMessageBubble = ({ children, isReceived }) => {
         Animated.parallel([
             Animated.spring(slideAnim, {
                 toValue: 0,
-                friction: 8,
+                friction: 7,
                 tension: 40,
                 useNativeDriver: true,
             }),
             Animated.timing(fadeAnim, {
                 toValue: 1,
-                duration: 250,
+                duration: 200,
                 useNativeDriver: true,
             }),
             Animated.spring(scaleAnim, {
                 toValue: 1,
-                friction: 8,
+                friction: 6,
+                tension: 45,
                 useNativeDriver: true,
             })
         ]).start();
@@ -77,6 +81,109 @@ const AnimatedMessageBubble = ({ children, isReceived }) => {
         }}>
             {children}
         </Animated.View>
+    );
+};
+
+const AnimatedReaction = ({ children }) => {
+    const scaleAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.spring(scaleAnim, {
+            toValue: 1,
+            friction: 5,
+            tension: 200, // High tension for "Pop"
+            useNativeDriver: true,
+        }).start();
+    }, []);
+
+    return (
+        <Animated.View style={{
+            transform: [{ scale: scaleAnim }]
+        }}>
+            {children}
+        </Animated.View>
+    );
+};
+
+const InteractableMessage = ({ children, onLongPress, style }) => {
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    const handlePressIn = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 0.96,
+            friction: 7,
+            useNativeDriver: true,
+        }).start();
+    };
+
+    const handlePressOut = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 1,
+            friction: 7,
+            useNativeDriver: true,
+        }).start();
+    };
+
+    return (
+        <TouchableWithoutFeedback
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            onLongPress={onLongPress}
+            delayLongPress={200}
+        >
+            <Animated.View style={[style, { transform: [{ scale: scaleAnim }] }]}>
+                {children}
+            </Animated.View>
+        </TouchableWithoutFeedback>
+    );
+};
+
+const TypingDot = ({ delay, color }) => {
+    const translateY = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(translateY, { toValue: -5, duration: 400, delay: delay, useNativeDriver: true }),
+                Animated.timing(translateY, { toValue: 0, duration: 400, useNativeDriver: true }),
+            ])
+        ).start();
+    }, []);
+
+    return <Animated.View style={[styles.typingDot, { backgroundColor: color, transform: [{ translateY }] }]} />;
+};
+
+const AnimatedTypingIndicator = ({ themeColors, isDark }) => {
+    const opacityAnim = useRef(new Animated.Value(0.4)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(opacityAnim, {
+                    toValue: 1,
+                    duration: 800,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(opacityAnim, {
+                    toValue: 0.4,
+                    duration: 800,
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+    }, []);
+
+    return (
+        <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={styles.typingIndicator}>
+            <Animated.View style={{ opacity: opacityAnim, flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={[styles.typingText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>TYPING</Text>
+                <View style={styles.typingDots}>
+                    {[0, 150, 300].map((delay, i) => (
+                        <TypingDot key={i} delay={delay} color={themeColors.accentPrimary} />
+                    ))}
+                </View>
+            </Animated.View>
+        </BlurView>
     );
 };
 
@@ -98,8 +205,13 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
     const [playingMessageId, setPlayingMessageId] = useState(null);
     const [sound, setSound] = useState(null);
     const [editingMessage, setEditingMessage] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    const [uploadingMedia, setUploadingMedia] = useState(false);
+    const [forwardModalVisible, setForwardModalVisible] = useState(false);
+    const [conversations, setConversations] = useState([]);
+    const [gifPickerVisible, setGifPickerVisible] = useState(false);
 
-    // E2EE State
     const [encryptionEnabled, setEncryptionEnabled] = useState(false);
     const [encryptionInitialized, setEncryptionInitialized] = useState(false);
 
@@ -145,6 +257,120 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
             setReactionPickerVisible(false);
             setSelectedMessageId(null);
         }
+    };
+
+    const handlePickMedia = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.All,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+
+            if (!result.canceled) {
+                sendMediaMessage(result.assets[0].uri, result.assets[0].type);
+            }
+        } catch (error) {
+            console.error('Error picking media:', error);
+            Alert.alert('Error', 'Failed to pick media');
+        }
+    };
+
+    const handleTakePhoto = async () => {
+        try {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
+                return;
+            }
+
+            const result = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+
+            if (!result.canceled) {
+                sendMediaMessage(result.assets[0].uri, 'image');
+            }
+        } catch (error) {
+            console.error('Error taking photo:', error);
+            Alert.alert('Error', 'Failed to take photo');
+        }
+    };
+
+    const sendMediaMessage = async (uri, type) => {
+        setUploadingMedia(true);
+        try {
+            const mediaUrl = await uploadFile(uri);
+            const messageType = type.includes('video') ? 'video' : 'image';
+
+            const tempMessage = {
+                id: Date.now().toString(),
+                senderId: user.id,
+                recipientId: chatTarget.id,
+                content: messageType === 'image' ? 'Sent an image' : 'Sent a video',
+                timestamp: new Date().toISOString(),
+                messageType: messageType,
+                attachmentUrls: [mediaUrl],
+                replyTo: replyToMessage?.id,
+                replyToDetails: replyToMessage
+            };
+
+            setMessages(prev => [...prev, tempMessage]);
+
+            sendMessage(
+                user.id,
+                chatTarget.id,
+                messageType === 'image' ? 'Sent an image' : 'Sent a video',
+                replyToMessage?.id,
+                false, // encrypted
+                messageType,
+                null, // voiceUrl
+                null, // voiceDuration
+                [mediaUrl]
+            );
+
+            setReplyToMessage(null);
+            setTimeout(scrollToBottom, 500);
+        } catch (error) {
+            console.error('Error uploading media:', error);
+            Alert.alert('Upload Failed', 'Failed to send media.');
+        } finally {
+            setUploadingMedia(false);
+        }
+    };
+
+    const handleSendGif = async (url) => {
+        const tempMessage = {
+            id: Date.now().toString(),
+            senderId: user.id,
+            recipientId: chatTarget.id,
+            content: 'Sent a GIF',
+            timestamp: new Date().toISOString(),
+            messageType: 'image',
+            attachmentUrls: [url],
+            replyTo: replyToMessage?.id,
+            replyToDetails: replyToMessage
+        };
+
+        setMessages(prev => [...prev, tempMessage]);
+
+        sendMessage(
+            user.id,
+            chatTarget.id,
+            'Sent a GIF',
+            replyToMessage?.id,
+            false,
+            'image',
+            null,
+            null,
+            [url]
+        );
+
+        setReplyToMessage(null);
+        setTimeout(scrollToBottom, 500);
     };
 
     const onLongPressMessage = (messageId) => {
@@ -212,10 +438,35 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
         }
     };
 
-    const handleForwardMessage = () => {
-        // TODO: Implement forward UI (select recipient)
+    const handleForwardMessage = async () => {
         setActionMenuVisible(false);
-        Alert.alert('Forward', 'Forward feature coming soon!');
+        try {
+            const data = await fetchConversations(user.id);
+            setConversations(data.filter(c => c.id !== chatTarget.id));
+            setForwardModalVisible(true);
+        } catch (error) {
+            console.error('Error fetching conversations for forward:', error);
+            Alert.alert('Error', 'Failed to load conversations');
+        }
+    };
+
+    const confirmForward = (targetConversation) => {
+        if (actionMenuMessage) {
+            sendMessage(
+                user.id,
+                targetConversation.id,
+                actionMenuMessage.content,
+                null, // replyTo
+                false, // encrypted
+                actionMenuMessage.messageType || 'text',
+                actionMenuMessage.voiceUrl,
+                actionMenuMessage.voiceDuration,
+                actionMenuMessage.attachmentUrls
+            );
+            setForwardModalVisible(false);
+            setActionMenuMessage(null);
+            Alert.alert('Success', `Message forwarded to ${targetConversation.name}`);
+        }
     };
 
     useEffect(() => {
@@ -570,9 +821,16 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
             return (
                 <View style={{ justifyContent: 'center', alignItems: 'center', width: 60 }}>
                     <Animated.View style={{ transform: [{ translateX: trans }] }}>
-                        <BlurView intensity={30} tint={isDark ? "dark" : "light"} style={{ width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' }}>
-                            <ArrowLeft size={16} color={themeColors.textMain} />
-                        </BlurView>
+                        <View style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 18,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                        }}>
+                            <ArrowLeft size={16} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
+                        </View>
                     </Animated.View>
                 </View>
             );
@@ -589,8 +847,7 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                 }}
             >
                 <AnimatedMessageBubble isReceived={!isMe}>
-                    <TouchableOpacity
-                        activeOpacity={0.9}
+                    <InteractableMessage
                         onLongPress={() => onLongPressMessage(item.id)}
                         style={styles.snapContainer}
                     >
@@ -612,10 +869,10 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                                         borderLeftWidth: 2,
                                         borderLeftColor: 'rgba(255,255,255,0.2)'
                                     }}>
-                                        <Text style={{ fontSize: 10, color: themeColors.textDim, fontWeight: '900', textTransform: 'uppercase', marginBottom: 2 }}>
+                                        <Text style={{ fontSize: 10, color: isDark ? themeColors.textDim : themeColors.textDimLight, fontWeight: '900', textTransform: 'uppercase', marginBottom: 2 }}>
                                             Replying to {item.replyToDetails.senderId === user.id ? 'You' : chatTarget.name}
                                         </Text>
-                                        <Text numberOfLines={1} style={{ fontSize: 13, color: themeColors.textDim }}>
+                                        <Text numberOfLines={1} style={{ fontSize: 13, color: isDark ? themeColors.textDim : themeColors.textDimLight }}>
                                             {item.replyToDetails.content}
                                         </Text>
                                     </View>
@@ -626,16 +883,16 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                                 </Text>
 
                                 {item.messageType === 'voice' ? (
-                                    <BlurView intensity={10} tint={isDark ? "dark" : "light"} style={{
+                                    <View style={{
                                         flexDirection: 'row',
                                         alignItems: 'center',
                                         marginTop: 4,
                                         paddingHorizontal: 12,
                                         paddingVertical: 10,
                                         borderRadius: 20,
-                                        backgroundColor: 'rgba(255,255,255,0.02)',
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
                                         borderWidth: 1,
-                                        borderColor: 'rgba(255,255,255,0.05)'
+                                        borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
                                     }}>
                                         <TouchableOpacity
                                             onPress={() => playVoiceMessage(item.voiceUrl, item.id)}
@@ -663,7 +920,7 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                                                     <View key={i} style={{
                                                         width: 2,
                                                         height: 4 + Math.random() * 12,
-                                                        backgroundColor: themeColors.textDim,
+                                                        backgroundColor: isDark ? themeColors.textDim : themeColors.textDimLight,
                                                         borderRadius: 1,
                                                         opacity: 0.3
                                                     }} />
@@ -671,18 +928,40 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                                             </View>
                                         </View>
 
-                                        <Text style={{ marginLeft: 10, fontSize: 12, fontWeight: '800', color: themeColors.textMain }}>
+                                        <Text style={{ marginLeft: 10, fontSize: 12, fontWeight: '800', color: isDark ? themeColors.textMain : themeColors.textMainLight }}>
                                             {item.voiceDuration ? `${Math.floor(item.voiceDuration / 60)}:${(item.voiceDuration % 60).toString().padStart(2, '0')}` : '0:00'}
                                         </Text>
-                                    </BlurView>
+                                    </View>
+                                ) : item.messageType === 'image' || (item.attachmentUrls && item.attachmentUrls.length > 0) ? (
+                                    <View style={styles.mediaMessageContainer}>
+                                        {item.attachmentUrls && item.attachmentUrls.map((url, idx) => (
+                                            <Image
+                                                key={idx}
+                                                source={{ uri: url }}
+                                                style={styles.messageImage}
+                                                resizeMode="cover"
+                                            />
+                                        ))}
+                                        {item.content && item.content !== 'Sent an image' && (
+                                            <Text style={[styles.messageText, { color: isDark ? themeColors.textMain : themeColors.textMainLight, marginTop: 8 }]}>
+                                                {item.content}
+                                            </Text>
+                                        )}
+                                    </View>
                                 ) : (
-                                    <Text style={[styles.messageText, { color: themeColors.textMain }]}>
-                                        {item.content}
-                                    </Text>
+                                    <View>
+                                        <Text style={[styles.messageText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
+                                            {item.content}
+                                        </Text>
+                                        {!item.isDeleted && (() => {
+                                            const urlMatch = item.content?.match(/(https?:\/\/[^\s]+)/);
+                                            return urlMatch ? <LinkPreviewCard url={urlMatch[0]} /> : null;
+                                        })()}
+                                    </View>
                                 )}
 
                                 <View style={styles.timestampRow}>
-                                    <Text style={[styles.timestamp, { color: themeColors.textDim }]}>
+                                    <Text style={[styles.timestamp, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>
                                         {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         {item.isEdited && <Text style={{ fontSize: 9, fontStyle: 'italic', opacity: 0.6 }}> • EDITED</Text>}
                                     </Text>
@@ -691,7 +970,7 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                                             {item.readAt ? (
                                                 <CheckCheck size={14} color={themeColors.accentPrimary} />
                                             ) : (
-                                                <Check size={14} color={themeColors.textDim} opacity={0.5} />
+                                                <Check size={14} color={isDark ? themeColors.textDim : themeColors.textDimLight} />
                                             )}
                                         </View>
                                     )}
@@ -703,101 +982,133 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
 
                             {hasReactions && (
                                 <View style={styles.snapReactions}>
-                                    <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={[styles.reactionsGlass, { borderColor: 'rgba(255,255,255,0.05)' }]}>
+                                    <View style={[styles.reactionsGlass, {
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                                        borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+                                    }]}>
                                         {Object.keys(item.reactions).map((emoji, index) => (
-                                            <TouchableOpacity
-                                                key={emoji}
-                                                onPress={() => toggleReaction(item.id, emoji)}
-                                                style={[styles.reactionTag, index > 0 && { marginLeft: 8 }]}
-                                            >
-                                                <Text style={styles.reactionEmojiText}>{emoji}</Text>
-                                                <Text style={[styles.reactionCountText, { color: themeColors.textMain }]}>
-                                                    {item.reactions[emoji].length}
-                                                </Text>
-                                            </TouchableOpacity>
+                                            <AnimatedReaction key={emoji}>
+                                                <TouchableOpacity
+                                                    onPress={() => toggleReaction(item.id, emoji)}
+                                                    style={[styles.reactionTag, index > 0 && { marginLeft: 8 }]}
+                                                >
+                                                    <Text style={styles.reactionEmojiText}>{emoji}</Text>
+                                                    <Text style={[styles.reactionCountText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
+                                                        {item.reactions[emoji].length}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </AnimatedReaction>
                                         ))}
-                                    </BlurView>
+                                    </View>
                                 </View>
                             )}
                         </View>
-                    </TouchableOpacity>
+                    </InteractableMessage>
                 </AnimatedMessageBubble>
             </Swipeable>
         );
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
-            <LinearGradient
-                colors={isDark ? ['#050810', '#000000'] : ['#F8FAFC', '#FFFFFF']}
-                style={StyleSheet.absoluteFill}
-            />
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Background Aura Glows removed for Organic Earth style */}
 
-            {/* Background Aura Glows */}
-            <View style={StyleSheet.absoluteFill}>
-                <View style={[styles.glowCircle, { top: -100, left: -200, backgroundColor: isDark ? '#3CB2E212' : '#3CB2E205' }]} />
-                <View style={[styles.glowCircle, { bottom: -100, right: -200, backgroundColor: isDark ? '#9C27B010' : '#9C27B003' }]} />
-            </View>
-
-            {/* Floating Glass Header */}
+            {/* Floating Header */}
             <View style={styles.headerWrapper}>
-                <BlurView intensity={45} tint={isDark ? "dark" : "light"} style={styles.headerGlass}>
+                <View style={[styles.headerGlass, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
                     <SafeAreaView edges={['top']}>
                         <View style={styles.header}>
-                            <TouchableOpacity onPress={onBack} activeOpacity={0.7} style={styles.backBtn}>
-                                <ArrowLeft color={themeColors.textMain} size={22} />
-                                <View style={[styles.btnHighlight, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]} />
+                            <TouchableOpacity
+                                onPress={isSearching ? () => { setIsSearching(false); setSearchQuery(''); } : onBack}
+                                activeOpacity={0.7}
+                                style={[styles.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                            >
+                                <ArrowLeft color={isDark ? themeColors.textMain : themeColors.textMainLight} size={22} />
                             </TouchableOpacity>
 
-                            <View style={styles.headerInfo}>
-                                <View style={styles.headerAvatarContainer}>
-                                    <LinearGradient
-                                        colors={isTargetOnline ? [themeColors.accentPrimary, themeColors.accentSecondary] : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-                                        style={styles.headerAvatarGlow}
-                                    >
-                                        {chatTarget.avatar ? (
-                                            <Image source={{ uri: chatTarget.avatar }} style={styles.headerAvatar} />
-                                        ) : (
-                                            <View style={[styles.headerAvatar, { backgroundColor: themeColors.bgCard, justifyContent: 'center', alignItems: 'center' }]}>
-                                                <User size={24} color={themeColors.textDim} />
-                                            </View>
-                                        )}
-                                    </LinearGradient>
-                                    {isTargetOnline && <View style={styles.headerOnlineBadge} />}
-                                </View>
-
-                                <View style={styles.headerTextContent}>
-                                    <Text style={[styles.headerName, { color: themeColors.textMain }]} numberOfLines={1}>{chatTarget.name}</Text>
-                                    <View style={styles.statusRow}>
-                                        <Text style={[styles.headerStatusText, { color: isTargetOnline ? themeColors.accentPrimary : themeColors.textDim }]}>
-                                            {isTargetOnline ? 'ONLINE NOW' : 'OFFLINE'}
-                                        </Text>
-                                        {isTargetOnline && (
-                                            <LinearGradient
-                                                colors={[themeColors.accentPrimary, themeColors.accentSecondary]}
-                                                style={styles.statusPulse}
-                                            />
-                                        )}
-                                    </View>
-                                    {/* Encryption Indicator */}
-                                    {encryptionEnabled && (
-                                        <View style={styles.encryptionBadge}>
-                                            <Lock size={10} color={themeColors.accentSuccess} />
-                                            <Text style={[styles.encryptionText, { color: themeColors.textDim }]}>
-                                                End-to-end encrypted
-                                            </Text>
-                                        </View>
+                            {isSearching ? (
+                                <View style={styles.searchHeaderContainer}>
+                                    <TextInput
+                                        autoFocus
+                                        style={[styles.searchInput, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}
+                                        placeholder="Search messages..."
+                                        placeholderTextColor={isDark ? themeColors.textDim : themeColors.textDimLight}
+                                        value={searchQuery}
+                                        onChangeText={setSearchQuery}
+                                    />
+                                    {searchQuery.length > 0 && (
+                                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                            <X size={18} color={isDark ? themeColors.textDim : themeColors.textDimLight} />
+                                        </TouchableOpacity>
                                     )}
                                 </View>
-                            </View>
+                            ) : (
+                                <>
+                                    <View style={styles.headerInfo}>
+                                        <View style={styles.headerAvatarContainer}>
+                                            <View
+                                                style={[styles.headerAvatarGlow, { backgroundColor: isTargetOnline ? themeColors.accentPrimary : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') }]}
+                                            >
+                                                {chatTarget.avatar ? (
+                                                    <Image source={{ uri: chatTarget.avatar }} style={styles.headerAvatar} />
+                                                ) : (
+                                                    <View style={[styles.headerAvatar, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, justifyContent: 'center', alignItems: 'center' }]}>
+                                                        <User size={24} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
+                                                    </View>
+                                                )}
+                                            </View>
+                                            {isTargetOnline && <View style={[styles.headerOnlineBadge, { borderColor: isDark ? themeColors.bgDark : themeColors.bgLight }]} />}
+                                        </View>
 
-                            <TouchableOpacity onPress={onOpenSavedMessages} activeOpacity={0.7} style={styles.headerAction}>
-                                <Bookmark color={themeColors.textMain} size={22} />
-                                <View style={[styles.btnHighlight, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]} />
-                            </TouchableOpacity>
+                                        <View style={styles.headerTextContent}>
+                                            <Text style={[styles.headerName, {
+                                                color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                                fontFamily: 'PlayfairDisplay-Bold'
+                                            }]} numberOfLines={1}>{chatTarget.name}</Text>
+                                            <View style={styles.statusRow}>
+                                                <Text style={[styles.headerStatusText, { color: isTargetOnline ? themeColors.accentPrimary : (isDark ? themeColors.textMuted : themeColors.textMutedLight) }]}>
+                                                    {isTargetOnline ? 'ONLINE NOW' : 'OFFLINE'}
+                                                </Text>
+                                                {isTargetOnline && (
+                                                    <View
+                                                        style={[styles.statusPulse, { backgroundColor: themeColors.accentPrimary }]}
+                                                    />
+                                                )}
+                                            </View>
+                                            {/* Encryption Indicator */}
+                                            {encryptionEnabled && (
+                                                <View style={styles.encryptionBadge}>
+                                                    <Lock size={10} color={themeColors.success} />
+                                                    <Text style={[styles.encryptionText, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>
+                                                        End-to-end encrypted
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.headerActions}>
+                                        <TouchableOpacity
+                                            onPress={() => setIsSearching(true)}
+                                            activeOpacity={0.7}
+                                            style={[styles.headerAction, { marginRight: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                                        >
+                                            <Search color={isDark ? themeColors.textMain : themeColors.textMainLight} size={20} />
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            onPress={onOpenSavedMessages}
+                                            activeOpacity={0.7}
+                                            style={[styles.headerAction, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                                        >
+                                            <Bookmark color={isDark ? themeColors.textMain : themeColors.textMainLight} size={22} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            )}
                         </View>
                     </SafeAreaView>
-                </BlurView>
+                </View>
             </View>
 
             <KeyboardAvoidingView
@@ -808,28 +1119,21 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                 {/* Messages List */}
                 <FlatList
                     ref={flatListRef}
-                    data={messages}
+                    data={messages.filter(m => m.content?.toLowerCase().includes(searchQuery.toLowerCase()))}
                     keyExtractor={item => item.id}
                     renderItem={renderMessage}
                     contentContainerStyle={styles.messagesList}
                     showsVerticalScrollIndicator={false}
                     ListEmptyComponent={
                         <View style={{ marginTop: 100, alignItems: 'center' }}>
-                            <Text style={{ color: themeColors.textDim, fontSize: 16, fontWeight: '600' }}>Say hello to {chatTarget.name}!</Text>
+                            <Text style={{ color: isDark ? themeColors.textDim : themeColors.textDimLight, fontSize: 16, fontWeight: '600' }}>Say hello to {chatTarget.name}!</Text>
                         </View>
                     }
                 />
 
                 {/* Typing Indicator (Floating) */}
                 {isTargetTyping && (
-                    <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={styles.typingIndicator}>
-                        <Text style={[styles.typingText, { color: themeColors.textMain }]}>TYPING</Text>
-                        <View style={styles.typingDots}>
-                            {[1, 2, 3].map(i => (
-                                <View key={i} style={[styles.typingDot, { backgroundColor: themeColors.accentPrimary }]} />
-                            ))}
-                        </View>
-                    </BlurView>
+                    <AnimatedTypingIndicator themeColors={themeColors} isDark={isDark} />
                 )}
 
                 {/* Input Section */}
@@ -841,12 +1145,12 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                                 <Text style={[styles.replySender, { color: themeColors.accentPrimary }]}>
                                     {editingMessage ? 'EDITING CHAT' : `REPLYING TO ${replyToMessage.senderId === user.id ? 'YOU' : chatTarget.name.toUpperCase()}`}
                                 </Text>
-                                <Text numberOfLines={1} style={[styles.replyText, { color: themeColors.textDim }]}>
+                                <Text numberOfLines={1} style={[styles.replyText, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>
                                     {editingMessage ? editingMessage.content : replyToMessage.content}
                                 </Text>
                             </View>
                             <TouchableOpacity onPress={() => editingMessage ? setEditingMessage(null) : setReplyToMessage(null)}>
-                                <X size={18} color={themeColors.textDim} />
+                                <X size={18} color={isDark ? themeColors.textDim : themeColors.textDimLight} />
                             </TouchableOpacity>
                         </BlurView>
                     )}
@@ -855,21 +1159,29 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                         {isRecording ? (
                             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }}>
                                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', marginRight: 10 }} />
-                                <Text style={{ color: themeColors.textMain, fontWeight: '800', fontSize: 16 }}>
+                                <Text style={{ color: isDark ? themeColors.textMain : themeColors.textMainLight, fontWeight: '800', fontSize: 16 }}>
                                     {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
                                 </Text>
-                                <Text style={{ marginLeft: 12, color: themeColors.textDim, fontSize: 13, fontWeight: '600' }}>Release to send voice chat</Text>
+                                <Text style={{ marginLeft: 12, color: isDark ? themeColors.textDim : themeColors.textDimLight, fontSize: 13, fontWeight: '600' }}>Release to send voice chat</Text>
                             </View>
                         ) : (
                             <>
-                                <TouchableOpacity style={styles.inputAction}>
-                                    <Camera color={themeColors.textMain} size={22} />
+                                <TouchableOpacity style={styles.inputAction} onPress={handleTakePhoto}>
+                                    <Camera color={isDark ? themeColors.textMain : themeColors.textMainLight} size={22} />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity style={styles.inputAction} onPress={handlePickMedia}>
+                                    <ImageIcon color={isDark ? themeColors.textMain : themeColors.textMainLight} size={22} />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity style={styles.inputAction} onPress={() => setGifPickerVisible(true)}>
+                                    <Gift color={isDark ? themeColors.textMain : themeColors.textMainLight} size={22} />
                                 </TouchableOpacity>
 
                                 <TextInput
-                                    style={[styles.inputMain, { color: themeColors.textMain }]}
+                                    style={[styles.inputMain, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}
                                     placeholder="Message..."
-                                    placeholderTextColor={themeColors.textDim}
+                                    placeholderTextColor={isDark ? themeColors.textDim : themeColors.textDimLight}
                                     value={newMessage}
                                     onChangeText={handleTextChange}
                                     multiline
@@ -892,7 +1204,7 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                                 {newMessage.trim() ? (
                                     <Send color="#FFF" size={20} fill="#FFF" />
                                 ) : (
-                                    <Mic color={isRecording ? "#FFF" : themeColors.textDim} size={22} />
+                                    <Mic color={isRecording ? "#FFF" : (isDark ? themeColors.textDim : themeColors.textDimLight)} size={22} />
                                 )}
                             </LinearGradient>
                         </TouchableOpacity>
@@ -927,29 +1239,34 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                         </View>
 
                         <TouchableOpacity style={styles.actionItem} onPress={() => { setReplyToMessage(actionMenuMessage); setActionMenuVisible(false); }}>
-                            <View style={styles.actionIconContainer}><ArrowLeft size={20} color={themeColors.textMain} /></View>
-                            <Text style={[styles.actionText, { color: themeColors.textMain }]}>Reply</Text>
+                            <View style={styles.actionIconContainer}><ArrowLeft size={20} color={isDark ? themeColors.textMain : themeColors.textMainLight} /></View>
+                            <Text style={[styles.actionText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Reply</Text>
                         </TouchableOpacity>
 
                         {actionMenuMessage?.senderId === user.id && (
                             <TouchableOpacity style={styles.actionItem} onPress={() => { setEditingMessage(actionMenuMessage); setNewMessage(actionMenuMessage.content); setActionMenuVisible(false); }}>
-                                <View style={styles.actionIconContainer}><Edit3 size={18} color={themeColors.textMain} /></View>
-                                <Text style={[styles.actionText, { color: themeColors.textMain }]}>Edit Chat</Text>
+                                <View style={styles.actionIconContainer}><Edit3 size={18} color={isDark ? themeColors.textMain : themeColors.textMainLight} /></View>
+                                <Text style={[styles.actionText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Edit Chat</Text>
                             </TouchableOpacity>
                         )}
 
                         <TouchableOpacity style={styles.actionItem} onPress={handleCopyMessage}>
-                            <View style={styles.actionIconContainer}><Copy size={18} color={themeColors.textMain} /></View>
-                            <Text style={[styles.actionText, { color: themeColors.textMain }]}>Copy Text</Text>
+                            <View style={styles.actionIconContainer}><Copy size={18} color={isDark ? themeColors.textMain : themeColors.textMainLight} /></View>
+                            <Text style={[styles.actionText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Copy Text</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionItem} onPress={handleForwardMessage}>
+                            <View style={styles.actionIconContainer}><Forward size={20} color={isDark ? themeColors.textMain : themeColors.textMainLight} /></View>
+                            <Text style={[styles.actionText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Forward</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.actionItem} onPress={handleSaveMessage}>
                             <View style={styles.actionIconContainer}>
                                 {savedMessageIds.has(actionMenuMessage?.id)
                                     ? <BookmarkCheck size={20} color={themeColors.accentPrimary} />
-                                    : <Bookmark size={20} color={themeColors.textMain} />}
+                                    : <Bookmark size={20} color={isDark ? themeColors.textMain : themeColors.textMainLight} />}
                             </View>
-                            <Text style={[styles.actionText, { color: themeColors.textMain }]}>
+                            <Text style={[styles.actionText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
                                 {savedMessageIds.has(actionMenuMessage?.id) ? 'Remove Bookmark' : 'Bookmark'}
                             </Text>
                         </TouchableOpacity>
@@ -963,6 +1280,55 @@ export default function ChatScreen({ user, chatTarget, onBack, onOpenSavedMessag
                     </BlurView>
                 </Pressable>
             </Modal>
+
+            {/* Forward Modal */}
+            <Modal visible={forwardModalVisible} transparent animationType="slide">
+                <Pressable style={styles.modalOverlay} onPress={() => setForwardModalVisible(false)}>
+                    <View style={[styles.forwardMenu, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+                        <View style={styles.forwardHeader}>
+                            <Text style={[styles.forwardTitle, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Forward To</Text>
+                            <TouchableOpacity onPress={() => setForwardModalVisible(false)}>
+                                <X size={24} color={isDark ? themeColors.textDim : themeColors.textDimLight} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <FlatList
+                            data={conversations}
+                            keyExtractor={item => item.id}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={styles.forwardUserItem}
+                                    onPress={() => confirmForward(item)}
+                                >
+                                    <View style={styles.forwardAvatar}>
+                                        {item.avatar ? (
+                                            <Image source={{ uri: item.avatar }} style={styles.forwardAvatarImg} />
+                                        ) : (
+                                            <User size={20} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
+                                        )}
+                                    </View>
+                                    <View style={styles.forwardUserInfo}>
+                                        <Text style={[styles.forwardUserName, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{item.name}</Text>
+                                        <Text style={[styles.forwardUserRole, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>{item.role}</Text>
+                                    </View>
+                                    <Send size={18} color={themeColors.accentPrimary} />
+                                </TouchableOpacity>
+                            )}
+                            ListEmptyComponent={
+                                <View style={{ padding: 40, alignItems: 'center' }}>
+                                    <Text style={{ color: isDark ? themeColors.textDim : themeColors.textDimLight }}>No other conversations found</Text>
+                                </View>
+                            }
+                        />
+                    </View>
+                </Pressable>
+            </Modal>
+            {/* Gif Picker */}
+            <GifPicker
+                visible={gifPickerVisible}
+                onClose={() => setGifPickerVisible(false)}
+                onSelect={handleSendGif}
+            />
         </View>
     );
 }
@@ -1002,7 +1368,6 @@ const styles = StyleSheet.create({
         borderRadius: 21,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.08)',
         overflow: 'hidden',
     },
     btnHighlight: {
@@ -1080,7 +1445,6 @@ const styles = StyleSheet.create({
         borderRadius: 21,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.08)',
         marginLeft: 10,
         overflow: 'hidden',
     },
@@ -1303,5 +1667,88 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '600',
         letterSpacing: -0.2,
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    searchHeaderContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 20,
+        marginHorizontal: 12,
+        height: 40,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    mediaMessageContainer: {
+        marginTop: 4,
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    messageImage: {
+        width: 240,
+        height: 180,
+        borderRadius: 12,
+    },
+    forwardMenu: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        paddingBottom: 40,
+        maxHeight: '80%',
+    },
+    forwardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 24,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.05)',
+    },
+    forwardTitle: {
+        fontSize: 20,
+        fontFamily: 'PlayfairDisplay-Bold',
+    },
+    forwardUserItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        marginHorizontal: 16,
+        borderRadius: 16,
+    },
+    forwardAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 14,
+        overflow: 'hidden',
+    },
+    forwardAvatarImg: {
+        width: '100%',
+        height: '100%',
+    },
+    forwardUserInfo: {
+        flex: 1,
+    },
+    forwardUserName: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    forwardUserRole: {
+        fontSize: 12,
+        fontWeight: '500',
     },
 });

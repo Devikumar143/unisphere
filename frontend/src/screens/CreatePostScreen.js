@@ -80,18 +80,20 @@ export default function CreatePostScreen({ user, onBack, isStory, communityConte
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
-            <LinearGradient
-                colors={[themeColors.bgDark, isDark ? '#0a0d1d' : '#F1F5F9']}
-                style={StyleSheet.absoluteFill}
-            />
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Background elements removed for Organic Earth style */}
 
             <SafeAreaView style={styles.safeArea}>
-                <View style={[styles.header, { borderBottomColor: themeColors.border }]}>
+                <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
                     <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                        <X color={themeColors.textMain} size={24} />
+                        <X color={isDark ? themeColors.textMain : themeColors.textMainLight} size={24} />
                     </TouchableOpacity>
-                    <Text style={[styles.headerTitle, { color: themeColors.textMain, flex: 1, marginLeft: 16 }]}>
+                    <Text style={[styles.headerTitle, {
+                        color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                        flex: 1,
+                        marginLeft: 16,
+                        fontFamily: 'PlayfairDisplay-Bold'
+                    }]}>
                         {isStory ? 'New Story' : 'New Post'}
                     </Text>
                     <TouchableOpacity
@@ -123,28 +125,28 @@ export default function CreatePostScreen({ user, onBack, isStory, communityConte
                             </View>
                         )}
                         <View style={{ flex: 1 }}>
-                            <Text style={[styles.userName, { color: themeColors.textMain }]}>{user?.name || user?.full_name || 'User'}</Text>
+                            <Text style={[styles.userName, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{user?.name || user?.full_name || 'User'}</Text>
                             <View style={styles.destinationRow}>
-                                <Text style={[styles.userRole, { color: themeColors.textDim }]}>Posting to </Text>
+                                <Text style={[styles.userRole, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Posting to </Text>
                                 <TouchableOpacity
                                     onPress={() => !communityContext && setSelectedCommunity(null)}
                                     disabled={!!communityContext}
                                 >
-                                    <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={styles.destinationBadge}>
+                                    <View style={[styles.destinationBadge, { backgroundColor: themeColors.accentPrimary + '15' }]}>
                                         <Text style={[styles.destinationText, { color: themeColors.accentPrimary }]}>
                                             {selectedCommunity ? selectedCommunity.communityName : 'Global Feed'}
                                         </Text>
                                         {(selectedCommunity && !communityContext) && <X size={12} color={themeColors.accentPrimary} style={{ marginLeft: 4 }} />}
-                                    </BlurView>
+                                    </View>
                                 </TouchableOpacity>
                             </View>
                         </View>
                     </View>
 
                     <TextInput
-                        style={[styles.input, { color: themeColors.textMain }, isStory && { fontSize: 22, textAlign: 'center' }]}
+                        style={[styles.input, { color: isDark ? themeColors.textMain : themeColors.textMainLight }, isStory && { fontSize: 22, textAlign: 'center' }]}
                         placeholder={isStory ? "Add a caption..." : "What's happening on campus?"}
-                        placeholderTextColor={themeColors.textDim}
+                        placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
                         multiline
                         autoFocus
                         value={content}
@@ -170,9 +172,9 @@ export default function CreatePostScreen({ user, onBack, isStory, communityConte
                         <View style={styles.imagePreviewContainer}>
                             <Image source={{ uri: imageUrl }} style={[styles.imagePreview, { backgroundColor: themeColors.bgCard }]} />
                             <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImageUrl('')}>
-                                <BlurView intensity={80} tint={isDark ? "dark" : "light"} style={styles.removeIconBlur}>
-                                    <X color={themeColors.textMain} size={16} />
-                                </BlurView>
+                                <View style={[styles.removeIconBlur, { backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)' }]}>
+                                    <X color={isDark ? '#FFF' : '#333'} size={16} />
+                                </View>
                             </TouchableOpacity>
                         </View>
                     ) : null}
@@ -193,9 +195,12 @@ export default function CreatePostScreen({ user, onBack, isStory, communityConte
                 </ScrollView>
 
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                    <View style={[styles.toolbar, { borderTopColor: themeColors.border, backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)' }]}>
+                    <View style={[styles.toolbar, {
+                        borderTopColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                        backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight
+                    }]}>
                         <TouchableOpacity
-                            style={[styles.toolbarBtn, { backgroundColor: themeColors.bgCard }]}
+                            style={[styles.toolbarBtn, { backgroundColor: themeColors.accentPrimary + '15' }]}
                             onPress={pickImage}
                             disabled={uploading}
                         >
@@ -204,10 +209,10 @@ export default function CreatePostScreen({ user, onBack, isStory, communityConte
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.toolbarBtn, { marginLeft: 12, backgroundColor: themeColors.bgCard }]}
+                            style={[styles.toolbarBtn, { marginLeft: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
                             onPress={() => setShowImageUrlInput(prev => !prev)}
                         >
-                            <Text style={[styles.toolbarText, { color: themeColors.textDim }]}>URL</Text>
+                            <Text style={[styles.toolbarText, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>URL</Text>
                         </TouchableOpacity>
                         {/* Future: Add Video, Polls, etc. */}
                     </View>

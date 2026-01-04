@@ -54,40 +54,35 @@ export default function MessagesScreen({ user, onOpenChat }) {
     );
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
-            {/* Deep Base Background */}
-            <LinearGradient
-                colors={isDark ? ['#050810', '#000000'] : ['#F8FAFC', '#FFFFFF']}
-                style={StyleSheet.absoluteFill}
-            />
-
-            {/* Atmospheric Aura Glows (Layered Above Base) */}
-            <View style={StyleSheet.absoluteFill}>
-                <View style={[styles.glowCircle, { top: -50, right: -100, backgroundColor: isDark ? '#3CB2E225' : '#3CB2E210' }]} />
-                <View style={[styles.glowCircle, { bottom: 50, left: -100, backgroundColor: isDark ? '#9C27B020' : '#9C27B008' }]} />
-                <View style={[styles.glowCircle, { top: '40%', alignSelf: 'center', width: 400, height: 400, backgroundColor: isDark ? '#6366F110' : '#6366F105' }]} />
-            </View>
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
+            {/* Background elements removed for Organic Earth style */}
 
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.header}>
                     <View style={styles.headerTop}>
-                        <Text style={[styles.headerTitle, { color: themeColors.textMain }]}>Messages</Text>
-                        <TouchableOpacity style={[styles.iconBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-                            <Users size={20} color={themeColors.textMain} />
+                        <Text style={[styles.headerTitle, {
+                            color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                            fontFamily: 'PlayfairDisplay-Bold'
+                        }]}>Messages</Text>
+                        <TouchableOpacity style={[styles.iconBtn, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, borderColor: themeColors.accentPrimary + '15', borderWidth: 1 }]}>
+                            <Users size={20} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
                         </TouchableOpacity>
                     </View>
 
-                    {/* Frosted Search Bar */}
-                    <BlurView intensity={isDark ? 30 : 60} tint={isDark ? "dark" : "light"} style={styles.searchContainer}>
-                        <Search size={18} color={themeColors.textDim} style={styles.searchIcon} />
+                    {/* Search Bar */}
+                    <View style={[styles.searchContainer, {
+                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                        borderColor: themeColors.accentPrimary + '15'
+                    }]}>
+                        <Search size={18} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} style={styles.searchIcon} />
                         <TextInput
                             placeholder="Search conversations..."
-                            placeholderTextColor={themeColors.textDim}
-                            style={[styles.searchInput, { color: themeColors.textMain }]}
+                            placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
+                            style={[styles.searchInput, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                         />
-                    </BlurView>
+                    </View>
                 </View>
 
                 {loading ? (
@@ -107,13 +102,13 @@ export default function MessagesScreen({ user, onOpenChat }) {
                         contentContainerStyle={styles.listContent}
                         ListEmptyComponent={
                             <View style={styles.emptyContainer}>
-                                <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={styles.emptyIconBox}>
-                                    <MessageSquare size={40} color={themeColors.textDim} opacity={0.5} />
-                                </BlurView>
-                                <Text style={[styles.emptyText, { color: themeColors.textMain }]}>
+                                <View style={[styles.emptyIconBox, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, borderColor: themeColors.accentPrimary + '15' }]}>
+                                    <MessageSquare size={40} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} opacity={0.5} />
+                                </View>
+                                <Text style={[styles.emptyText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
                                     {searchQuery ? "No matches found" : "No messages yet"}
                                 </Text>
-                                <Text style={[styles.emptySubtext, { color: themeColors.textDim }]}>
+                                <Text style={[styles.emptySubtext, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
                                     {searchQuery ? "Try searching for someone else" : "Start a conversation from Explore"}
                                 </Text>
                             </View>

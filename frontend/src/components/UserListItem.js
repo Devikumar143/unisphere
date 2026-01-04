@@ -19,35 +19,39 @@ export default function UserListItem({ user, onPress }) {
             activeOpacity={0.7}
             style={styles.container}
         >
-            <BlurView intensity={GLASS.intensity} tint={isDark ? "dark" : "light"} style={[styles.card, { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }]}>
+            <View style={[styles.card, {
+                backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                borderColor: themeColors.accentPrimary + '10',
+                borderWidth: 1
+            }]}>
                 <View>
-                    <Image source={{ uri: user.avatar }} style={[styles.avatar, { borderColor: themeColors.border }]} />
-                    {user.isOnline && <View style={[styles.onlineBadge, { borderColor: themeColors.bgDark }]} />}
+                    <Image source={{ uri: user.avatar }} style={[styles.avatar, { borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]} />
+                    {user.isOnline && <View style={[styles.onlineBadge, { borderColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]} />}
                 </View>
                 <View style={styles.info}>
                     <View style={styles.nameRow}>
-                        <Text style={[styles.name, { color: themeColors.textMain }]} numberOfLines={1}>{user.name}</Text>
+                        <Text style={[styles.name, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]} numberOfLines={1}>{user.name}</Text>
                         {user.lastMessageTime && (
-                            <Text style={[styles.time, { color: themeColors.textMuted }]}>{formatTime(user.lastMessageTime)}</Text>
+                            <Text style={[styles.time, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>{formatTime(user.lastMessageTime)}</Text>
                         )}
                     </View>
 
                     {user.lastMessage ? (
-                        <Text style={[styles.lastMessage, { color: themeColors.textDim }]} numberOfLines={1}>
+                        <Text style={[styles.lastMessage, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]} numberOfLines={1}>
                             {user.lastMessage}
                         </Text>
                     ) : (
-                        <Text style={[styles.role, { color: themeColors.textDim }]} numberOfLines={1}>
+                        <Text style={[styles.role, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]} numberOfLines={1}>
                             {user.role} • {user.department}
                         </Text>
                     )}
                 </View>
                 {!user.lastMessage && (
-                    <View style={[styles.messageBtn, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)' }]}>
+                    <View style={[styles.messageBtn, { backgroundColor: themeColors.accentPrimary + '15' }]}>
                         <MessageCircle size={20} color={themeColors.accentPrimary} />
                     </View>
                 )}
-            </BlurView>
+            </View>
         </TouchableOpacity>
     );
 }

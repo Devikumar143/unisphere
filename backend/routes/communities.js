@@ -114,6 +114,17 @@ router.get('/:id', async (req, res) => {
                     FROM users u WHERE u.id = c.created_by
                 ) as admin_details,
                 (
+                    SELECT json_build_object(
+                        'id', cm_msg.id,
+                        'content', cm_msg.message,
+                        'senderName', u_sender.full_name,
+                        'timestamp', cm_msg.sent_at
+                    )
+                    FROM chat_messages cm_msg
+                    JOIN users u_sender ON cm_msg.sender_id = u_sender.id
+                    WHERE cm_msg.id = c.pinned_message_id
+                ) as pinned_message,
+                (
                     SELECT JSONB_AGG(m) FROM (
                         SELECT u.full_name, u.id FROM community_members cm
                         JOIN users u ON cm.user_id = u.id
@@ -244,6 +255,63 @@ router.delete('/:id', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error deleting community' });
+    }
+});
+
+// Pin Message
+router.post('/:id/pin', async (req, res) => {
+    const communityId = req.params.id;
+    const { messageId, userId } = req.body;
+    try {
+        // Verify Admin
+        const checkSql = `SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2`;
+        const checkResult = await query(checkSql, [communityId, userId]);
+        if (checkResult.rows.length === 0 || checkResult.rows[0].role !== 'admin') {
+            return res.status(403).json({ error: 'Only admins can pin messages' });
+        }
+
+        await query(`UPDATE communities SET pinned_message_id = $1 WHERE id = $2`, [messageId, communityId]);
+
+        // Fetch pinned message details to return
+        const msgSql = `
+            SELECT cm.id, cm.message as content, u.full_name as "senderName", cm.sent_at as timestamp
+            FROM chat_messages cm
+            JOIN users u ON cm.sender_id = u.id
+            WHERE cm.id = $1
+        `;
+        const msgResult = await query(msgSql, [messageId]);
+
+        res.json({ success: true, pinnedMessage: msgResult.rows[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error pinning message' });
+    }
+});
+
+// Unpin Message
+router.post('/:id/unpin', async (req, res) => {
+    const communityId = req.params.id;
+    const { userId } = req.body;
+    try {
+        // Verify Admin
+        const checkSql = `SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2`;
+        const checkResult = await query(checkSql, [communityId, userId]);
+        if (checkResult.rows.length === 0 || checkResult.rows[0].role !== 'admin') {
+            return res.status(403).json({ error: 'Only admins can unpin messages' });
+        }
+
+        await query(`UPDATE communities SET pinned_message_id = NULL WHERE id = $1`, [communityId]);
+
+        // Broadcast update
+        req.io.to(`community_${communityId}`).emit('community_pinned_message_updated', {
+            communityId,
+            pinnedMessage: null
+        });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error unpinning message' });
     }
 });
 

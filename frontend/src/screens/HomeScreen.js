@@ -15,11 +15,11 @@ import { Bell, PlusSquare, Camera, TrendingUp, Users, Calendar, Zap, Search } fr
 
 
 const QUICK_ACTIONS = [
-    { id: 'trending', label: 'Trending', icon: TrendingUp, color: '#f59e0b' },
-    { id: 'clubs', label: 'Clubs', icon: Users, color: '#8b5cf6' },
-    { id: 'events', label: 'Events', icon: Calendar, color: '#ec4899' },
-    { id: 'buddies', label: 'Find Buddy', icon: Zap, color: '#10b981' },
-    { id: 'search', label: 'Search', icon: Search, color: '#3b82f6' },
+    { id: 'trending', label: 'Trending', icon: TrendingUp, color: '#BC7C6C' }, // Terracotta
+    { id: 'clubs', label: 'Clubs', icon: Users, color: '#7D8E74' }, // Sage
+    { id: 'events', label: 'Events', icon: Calendar, color: '#AB947E' }, // Warm Bark
+    { id: 'buddies', label: 'Find Buddy', icon: Zap, color: '#6B8E23' }, // Olive Drab
+    { id: 'search', label: 'Search', icon: Search, color: '#5C677D' }, // Storm Blue
 ];
 
 export default function HomeScreen({ user, onOpenNotifications, onCreatePost }) {
@@ -142,60 +142,42 @@ export default function HomeScreen({ user, onOpenNotifications, onCreatePost }) 
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: themeColors.bgDark }]}>
+        <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
             {/* Custom Success Toast */}
             {showToast && (
                 <Animated.View style={[styles.toast, { transform: [{ translateY: toastAnim }] }]}>
-                    <BlurView intensity={90} tint={isDark ? "dark" : "light"} style={styles.toastBlur}>
-                        <View style={styles.toastContent}>
-                            <View style={[styles.toastIcon, { backgroundColor: themeColors.accentPrimary }]}>
-                                <Text style={{ color: themeColors.bgDark, fontWeight: 'bold' }}>i</Text>
-                            </View>
-                            <Text style={[styles.toastText, { color: themeColors.textMain }]}>{toastMessage}</Text>
+                    <View style={[styles.toastContent, { backgroundColor: themeColors.accentPrimary }]}>
+                        <View style={styles.toastIcon}>
+                            <Text style={{ color: 'white', fontWeight: 'bold' }}>✓</Text>
                         </View>
-                    </BlurView>
+                        <Text style={styles.toastText}>{toastMessage}</Text>
+                    </View>
                 </Animated.View>
             )}
 
-            <LinearGradient
-                colors={[themeColors.bgDark, isDark ? '#020617' : '#EFF6FF']}
-                style={StyleSheet.absoluteFill}
-            />
-
             <SafeAreaView style={styles.safeArea}>
-                {/* Aura Glow Effect */}
-                <View style={styles.auraContainer}>
-                    <LinearGradient
-                        colors={[
-                            isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)',
-                            'transparent'
-                        ]}
-                        style={styles.aura}
-                    />
-                </View>
-
                 <View style={styles.header}>
                     <View style={styles.greetingSection}>
-                        <Text style={[styles.greetingText, { color: themeColors.textDim }]}>
+                        <Text style={[styles.greetingText, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
                             {getGreeting()},
                         </Text>
-                        <Text style={[styles.userNameText, { color: themeColors.textMain }]}>
+                        <Text style={[styles.userNameText, { color: isDark ? themeColors.textMain : themeColors.textMainLight, fontFamily: 'PlayfairDisplay-Bold' }]}>
                             {user?.name?.split(' ')[0] || 'Viky'}
                         </Text>
                     </View>
 
                     <View style={styles.headerActions}>
                         <TouchableOpacity onPress={() => onCreatePost()} style={styles.headerActionBtn}>
-                            <BlurView intensity={isDark ? 30 : 50} tint={isDark ? "dark" : "light"} style={styles.iconCircle}>
+                            <View style={[styles.iconCircle, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, borderColor: themeColors.accentPrimary + '20' }]}>
                                 <PlusSquare color={themeColors.accentPrimary} size={22} />
-                            </BlurView>
+                            </View>
                         </TouchableOpacity>
 
                         <TouchableOpacity onPress={onOpenNotifications} style={styles.headerActionBtn}>
-                            <BlurView intensity={isDark ? 30 : 50} tint={isDark ? "dark" : "light"} style={styles.iconCircle}>
-                                <Bell color={themeColors.textMain} size={22} />
+                            <View style={[styles.iconCircle, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, borderColor: themeColors.accentPrimary + '20' }]}>
+                                <Bell color={isDark ? themeColors.textMain : themeColors.textMainLight} size={22} />
                                 <View style={[styles.notificationDot, { backgroundColor: themeColors.accentPrimary }]} />
-                            </BlurView>
+                            </View>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -223,18 +205,17 @@ export default function HomeScreen({ user, onOpenNotifications, onCreatePost }) 
                                     activeOpacity={0.7}
                                     onPress={() => handleQuickAction(action.id)}
                                 >
-                                    <BlurView
-                                        intensity={isDark ? 20 : 40}
-                                        tint={isDark ? "dark" : "light"}
-                                        style={styles.actionCard}
-                                    >
-                                        <View style={[styles.actionIconContainer, { backgroundColor: action.color + '20' }]}>
+                                    <View style={[styles.actionCard, {
+                                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
+                                        borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+                                    }]}>
+                                        <View style={[styles.actionIconContainer, { backgroundColor: action.color + '15' }]}>
                                             <action.icon size={20} color={action.color} />
                                         </View>
-                                        <Text style={[styles.actionLabel, { color: themeColors.textMain }]}>
+                                        <Text style={[styles.actionLabel, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
                                             {action.label}
                                         </Text>
-                                    </BlurView>
+                                    </View>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -244,7 +225,10 @@ export default function HomeScreen({ user, onOpenNotifications, onCreatePost }) 
                     <AdCarousel ads={ads} />
 
                     <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: themeColors.textMain }]}>Campus Pulse</Text>
+                        <Text style={[styles.sectionTitle, {
+                            color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                            fontFamily: 'PlayfairDisplay-SemiBold'
+                        }]}>Campus Pulse</Text>
                     </View>
 
                     {/* Posts Feed */}
@@ -252,7 +236,7 @@ export default function HomeScreen({ user, onOpenNotifications, onCreatePost }) 
                         {loading ? (
                             <ActivityIndicator size="large" color={themeColors.accentPrimary} style={{ marginTop: 20 }} />
                         ) : posts.length === 0 ? (
-                            <Text style={[styles.emptyText, { color: themeColors.textDim }]}>No posts yet. Be the first to share!</Text>
+                            <Text style={[styles.emptyText, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>No posts yet. Be the first to share!</Text>
                         ) : (
                             posts.map(post => (
                                 <PostCard
@@ -295,28 +279,29 @@ const styles = StyleSheet.create({
     toastContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#6366f1', // Indigo base
+        paddingHorizontal: 20,
+        paddingVertical: 14,
         borderRadius: 30,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.2,
-        shadowRadius: 20,
+        shadowRadius: 15,
+        elevation: 10,
     },
     toastIcon: {
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: 'rgba(255,255,255,0.25)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 10,
+        marginRight: 12,
     },
     toastText: {
         color: 'white',
-        fontWeight: '700',
-        fontSize: 14,
+        fontWeight: 'bold',
+        fontSize: 15,
+        fontFamily: 'Inter-Bold',
     },
     safeArea: {
         flex: 0,
