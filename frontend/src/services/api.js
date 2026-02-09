@@ -931,7 +931,8 @@ export const fetchAds = async () => {
 
 export const createAd = async (adData) => {
     try {
-        const token = await AsyncStorage.getItem('userToken');
+        const session = await AsyncStorage.getItem('user_session');
+        const token = session ? JSON.parse(session).token : null;
         const response = await fetch(`${API_URL}/ads`, {
             method: 'POST',
             headers: {
@@ -951,7 +952,8 @@ export const createAd = async (adData) => {
 
 export const deleteAd = async (id) => {
     try {
-        const token = await AsyncStorage.getItem('userToken');
+        const session = await AsyncStorage.getItem('user_session');
+        const token = session ? JSON.parse(session).token : null;
         const response = await fetch(`${API_URL}/ads/${id}`, {
             method: 'DELETE',
             headers: {

@@ -32,8 +32,10 @@ router.post('/', authenticateToken, async (req, res) => {
         // Verify Admin Role
         const userRes = await query('SELECT role FROM users WHERE id = $1', [req.user.id]);
         if (userRes.rows.length === 0 || userRes.rows[0].role !== 'Admin') {
+            console.warn(`[Ads] Access denied for User ID: ${req.user.id}. Role: ${userRes.rows[0]?.role || 'none'}`);
             return res.status(403).json({ error: 'Access denied. Admins only.' });
         }
+        console.log(`[Ads] Authorized create for User ID: ${req.user.id}`);
 
         const sql = `
             INSERT INTO ads (title, image_url, redirect_url, category)
@@ -55,8 +57,10 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         // Verify Admin Role
         const userRes = await query('SELECT role FROM users WHERE id = $1', [req.user.id]);
         if (userRes.rows.length === 0 || userRes.rows[0].role !== 'Admin') {
+            console.warn(`[Ads] Access denied for User ID: ${req.user.id}. Role: ${userRes.rows[0]?.role || 'none'}`);
             return res.status(403).json({ error: 'Access denied. Admins only.' });
         }
+        console.log(`[Ads] Authorized delete for Ad ID: ${id} by User ID: ${req.user.id}`);
 
         await query('DELETE FROM ads WHERE id = $1', [id]);
         res.json({ success: true, message: 'Ad deleted successfully' });

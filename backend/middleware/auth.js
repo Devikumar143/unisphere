@@ -9,7 +9,11 @@ const authenticateToken = (req, res, next) => {
     const EXTRACT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 
     jwt.verify(token, EXTRACT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({ error: 'Invalid token' });
+        if (err) {
+            console.error('[AuthMiddleware] JWT Verification Failed:', err.message);
+            return res.status(403).json({ error: 'Invalid token' });
+        }
+        console.log('[AuthMiddleware] Token verified for User ID:', user.id);
         req.user = user;
         next();
     });

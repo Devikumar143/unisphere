@@ -64,7 +64,8 @@ export default function AdManagementScreen({ onBack, currentUser }) {
                             await deleteAd(id);
                             setAds(prev => prev.filter(a => a.id !== id));
                         } catch (error) {
-                            Alert.alert("Error", "Failed to delete ad");
+                            console.error('[AdManagement] Delete Error:', error);
+                            Alert.alert("Error", error.message || "Failed to delete ad");
                         }
                     }
                 }
@@ -97,6 +98,7 @@ export default function AdManagementScreen({ onBack, currentUser }) {
             const imageUrl = await uploadFile(image.uri);
 
             // 2. Create Ad Record
+            console.log(`[AdManagement] Creating ad: ${title} with image: ${imageUrl}`);
             await createAd({
                 title,
                 imageUrl,
@@ -109,8 +111,8 @@ export default function AdManagementScreen({ onBack, currentUser }) {
             loadAds();
             Alert.alert("Success", "Ad posted successfully! ✨");
         } catch (error) {
-            console.error(error);
-            Alert.alert("Error", "Failed to create ad");
+            console.error('[AdManagement] Create Error:', error);
+            Alert.alert("Error", error.message || "Failed to create ad");
         } finally {
             setSubmitting(false);
         }
