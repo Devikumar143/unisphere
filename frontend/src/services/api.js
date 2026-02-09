@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // --- Production Configuration ---
@@ -930,9 +931,13 @@ export const fetchAds = async () => {
 
 export const createAd = async (adData) => {
     try {
+        const token = await AsyncStorage.getItem('userToken');
         const response = await fetch(`${API_URL}/ads`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify(adData),
         });
         const data = await response.json();
@@ -946,7 +951,13 @@ export const createAd = async (adData) => {
 
 export const deleteAd = async (id) => {
     try {
-        const response = await fetch(`${API_URL}/ads/${id}`, { method: 'DELETE' });
+        const token = await AsyncStorage.getItem('userToken');
+        const response = await fetch(`${API_URL}/ads/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Failed to delete ad');
         return data;

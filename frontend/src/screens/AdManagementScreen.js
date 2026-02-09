@@ -17,12 +17,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../context/ThemeContext';
-import { fetchAds, createAd, deleteAd, uploadFile } from '../services/api';
+import { fetchAds, createAd, deleteAd, uploadFile, cleanImageUrl } from '../services/api';
 import { ArrowLeft, Plus, Trash2, Camera, X } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../constants/theme';
 
-export default function AdManagementScreen({ onBack }) {
+export default function AdManagementScreen({ onBack, currentUser }) {
     const { isDark, themeColors } = useTheme();
     const [ads, setAds] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -118,7 +118,7 @@ export default function AdManagementScreen({ onBack }) {
 
     const renderAdItem = ({ item }) => (
         <View style={[styles.adCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#fff' }]}>
-            <Image source={{ uri: item.image_url }} style={styles.adThumb} />
+            <Image source={{ uri: cleanImageUrl(item.image_url) }} style={styles.adThumb} />
             <View style={styles.adInfo}>
                 <Text style={[styles.adTitle, { color: themeColors.textMain }]} numberOfLines={1}>{item.title}</Text>
                 <Text style={[styles.adCategory, { color: themeColors.textDim }]}>{item.category}</Text>

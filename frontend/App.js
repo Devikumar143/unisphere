@@ -469,7 +469,7 @@ function AppContent() {
           />
         );
       case 'AD_MANAGEMENT':
-        return <AdManagementScreen onBack={() => setCurrentScreen('MAIN')} />;
+        return <AdManagementScreen currentUser={user} onBack={() => setCurrentScreen('MAIN')} />;
       case 'AD_INFO':
         return <AdInfoScreen onBack={() => setCurrentScreen('SETTINGS')} />;
       case 'CREATE_POST':

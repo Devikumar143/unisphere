@@ -28,10 +28,11 @@ router.post('/', upload.single('file'), (req, res) => {
         return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    // Construct URL
-    // Assuming API is hosted at root/api, but images served at root/uploads
-    // Use full URL for robustness
+    const host = req.get('host');
+    const filename = req.file.filename;
     const protocol = req.get('x-forwarded-proto') || req.protocol;
+
+    // Construct absolute URL for the uploaded file
     const url = `${protocol}://${host}/uploads/${filename}`;
 
     res.json({ url });
