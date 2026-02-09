@@ -137,10 +137,16 @@ function AppContent() {
 
   useEffect(() => {
     if (user && user.id) {
+      console.log('[Push] User logged in, starting registration...');
       registerForPushNotificationsAsync().then(token => {
         if (token) {
+          console.log('[Push] Token generated:', token);
           setExpoPushToken(token);
-          updatePushToken(user.id, token);
+          updatePushToken(user.id, token).then(res => {
+            console.log('[Push] Server updated:', res?.success ? 'Success' : 'Failed', res);
+          });
+        } else {
+          console.warn('[Push] No token generated.');
         }
       });
     }

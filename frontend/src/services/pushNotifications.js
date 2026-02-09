@@ -21,10 +21,9 @@ if (!isExpoGo) {
 }
 
 export async function registerForPushNotificationsAsync() {
-    // Gracefully exit if in Expo Go, which doesn't support remote notifications in SDK 53
+    // Log if in Expo Go, but attempt registration anyway for debugging
     if (isExpoGo) {
-        console.log('[Push] Skipping registration: Remote notifications not supported in Expo Go (SDK 53+).');
-        return null;
+        console.log('[Push] Registration: Attempting in Expo Go (might be unreliable in SDK 53+).');
     }
 
     if (Platform.OS === 'android') {

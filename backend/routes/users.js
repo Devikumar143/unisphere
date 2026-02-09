@@ -485,13 +485,12 @@ router.post('/:id/push-token', async (req, res) => {
     const { token } = req.body;
 
     try {
-        // Use jsonb_set to update or add the pushToken in bio_metadata
-        // COALESCE handles cases where bio_metadata might be null
+        // Use jsonb_set with to_jsonb to ensure the token is stored correctly as a string
         await query(
             `UPDATE users 
-             SET bio_metadata = jsonb_set(COALESCE(bio_metadata, '{}'), '{pushToken}', $1) 
+             SET bio_metadata = jsonb_set(COALESCE(bio_metadata, '{}'), '{pushToken}', to_jsonb($1::text)) 
              WHERE id = $2`,
-            [JSON.stringify(token), id]
+            [token, id]
         );
         res.json({ success: true, message: 'Push token updated successfully' });
     } catch (err) {
