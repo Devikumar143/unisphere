@@ -9,9 +9,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 // Register User
 router.post('/register', async (req, res) => {
     const { fullName, email, password, department, role, username } = req.body;
+    const cleanUsername = username ? username.trim() : null;
 
-    if (!fullName || !email || !password || !username) {
+    if (!fullName || !email || !password || !cleanUsername) {
         return res.status(400).json({ error: 'Please provide all required fields' });
+    }
+
+    if (!/^[a-zA-Z0-9._]{3,30}$/.test(cleanUsername)) {
+        return res.status(400).json({ error: 'Username must be 3-30 chars, alphanumeric, underscore or dot.' });
     }
 
     if (!email.toLowerCase().endsWith('@joyuniversity.edu.in')) {
@@ -20,8 +25,8 @@ router.post('/register', async (req, res) => {
 
     try {
         // Check if user exists (email or username)
-        console.log('[Auth] Checking existence for Email:', email, 'Username:', username);
-        const userCheck = await query('SELECT id, email, username FROM users WHERE email = $1 OR username = $2', [email, username]);
+        console.log('[Auth] Checking existence for Email:', email, 'Username:', cleanUsername);
+        const userCheck = await query('SELECT id, email, username FROM users WHERE email = $1 OR username = $2', [email, cleanUsername]);
         if (userCheck.rows.length > 0) {
             console.log('[Auth] Duplicate found:', userCheck.rows[0]);
             return res.status(400).json({ error: 'User with this email or username already exists' });
@@ -33,7 +38,7 @@ router.post('/register', async (req, res) => {
 
         const newUserMatches = await query(
             'INSERT INTO users (full_name, email, password_hash, role, department, username) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, email, role, username, is_verified, subscription_type, subscription_expiry',
-            [fullName, email, passwordHash, role || 'Student', department, username]
+            [fullName, email, passwordHash, role || 'Student', department, cleanUsername]
         );
 
         const newUser = newUserMatches.rows[0];

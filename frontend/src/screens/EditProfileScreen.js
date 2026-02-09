@@ -54,7 +54,11 @@ export default function EditProfileScreen({ user, onBack, onUpdateSuccess }) {
                 finalAvatar = await uploadUserAvatar(user.id, avatar);
             }
 
-            const updatedUserRes = await updateUserProfile(user.id, formData);
+            const cleanFormData = {
+                ...formData,
+                username: formData.username.trim()
+            };
+            const updatedUserRes = await updateUserProfile(user.id, cleanFormData);
 
             // Merge avatar into the result
             const finalUser = {

@@ -180,17 +180,18 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { name, department, location, bio, username } = req.body;
+    const cleanUsername = username ? username.trim() : null;
 
     // We keep existing metadata and merge new values
     try {
         // Validate username formatting if provided
-        if (username && !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
-            return res.status(400).json({ error: 'Username must be 3-30 chars, alphanumeric or underscore.' });
+        if (cleanUsername && !/^[a-zA-Z0-9._]{3,30}$/.test(cleanUsername)) {
+            return res.status(400).json({ error: 'Username must be 3-30 chars, alphanumeric, underscore or dot.' });
         }
 
         // Check uniqueness if updating username
-        if (username) {
-            const check = await query('SELECT id FROM users WHERE username = $1 AND id != $2', [username, id]);
+        if (cleanUsername) {
+            const check = await query('SELECT id FROM users WHERE username = $1 AND id != $2', [cleanUsername, id]);
             if (check.rows.length > 0) {
                 return res.status(400).json({ error: 'Username already taken.' });
             }
@@ -216,7 +217,7 @@ router.put('/:id', async (req, res) => {
             RETURNING *
         `;
 
-        const result = await query(sql, [name, department, metadata, username, id]);
+        const result = await query(sql, [name, department, metadata, cleanUsername, id]);
 
         const user = result.rows[0];
         // Return updated profile structure

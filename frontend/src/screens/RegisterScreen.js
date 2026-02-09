@@ -52,7 +52,11 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
         setError('');
 
         try {
-            await registerUser(formData);
+            const cleanFormData = {
+                ...formData,
+                username: formData.username.trim()
+            };
+            await registerUser(cleanFormData);
             console.log('[Register] Registration success, logging in...');
 
             // Auto Login
