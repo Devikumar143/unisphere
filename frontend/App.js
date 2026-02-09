@@ -44,7 +44,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import SplashScreenComponent from './src/screens/SplashScreen';
 
 // Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
+// SplashScreen.preventAutoHideAsync();
 
 function AppContent() {
   const { isDark, themeColors } = useTheme();
@@ -55,7 +55,7 @@ function AppContent() {
   const [communityTarget, setCommunityTarget] = useState(null); // Community we are viewing
   const [currentPost, setCurrentPost] = useState(null); // Post we are viewing
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [postContext, setPostContext] = useState(null); // { communityId, communityName }
   const [lastTab, setLastTab] = useState('Home');
   const [expoPushToken, setExpoPushToken] = useState('');
@@ -129,6 +129,8 @@ function AppContent() {
         SplashScreen.hideAsync().catch(() => { });
       }
     }, 5000);
+
+    SplashScreen.hideAsync().catch(() => { });
 
     return () => clearTimeout(failsafe);
   }, []);
