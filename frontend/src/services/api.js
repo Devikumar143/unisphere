@@ -17,6 +17,18 @@ const DEVELOPMENT_URL = getDevUrl();
 
 export const API_URL = __DEV__ ? DEVELOPMENT_URL : PRODUCTION_URL;
 
+// Helper to ensure URLs are production-ready (Upgrade to HTTPS)
+export const cleanImageUrl = (url) => {
+    if (!url) return null;
+    if (typeof url !== 'string') return url;
+
+    // Force HTTPS for production Render domain
+    if (url.includes('unisphere-api.onrender.com') && url.startsWith('http:')) {
+        return url.replace('http:', 'https:');
+    }
+    return url;
+};
+
 export const remoteLog = async (level, message, details = {}) => {
     try {
         await fetch(`${API_URL}/logs`, {

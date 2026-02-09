@@ -7,7 +7,7 @@ import { Video, ResizeMode } from 'expo-av';
 import ReelItem from '../components/ReelItem';
 import { COLORS, GLASS, SIZES } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
-import { fetchUserProfile, fetchUserByUsername, followUser, fetchUserPosts, deletePost, fetchUserFollowers, fetchUserFollowing, updateUserStatus, fetchReels, fetchUserReels, likePost, addComment, fetchComments, recordReelView } from '../services/api';
+import { fetchUserProfile, fetchUserByUsername, followUser, fetchUserPosts, deletePost, fetchUserFollowers, fetchUserFollowing, updateUserStatus, fetchReels, fetchUserReels, likePost, addComment, fetchComments, recordReelView, cleanImageUrl } from '../services/api';
 import PostCard from '../components/PostCard';
 import UserListItem from '../components/UserListItem';
 import { Alert } from 'react-native';
@@ -330,7 +330,7 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                         onPress={() => handleImagePress(displayProfile.avatar)}
                     >
                         <Image
-                            source={{ uri: displayProfile.avatar || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800&fit=crop" }}
+                            source={{ uri: cleanImageUrl(displayProfile.avatar) || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800&fit=crop" }}
                             style={StyleSheet.absoluteFill}
                             resizeMode="cover"
                         />

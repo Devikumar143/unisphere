@@ -4,7 +4,7 @@ import { BlurView } from 'expo-blur';
 import { Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Trash, AlertTriangle, Clock, User, CheckCircle2, Bookmark, BadgeCheck } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, GLASS, SIZES, SHADOWS } from '../constants/theme';
-import { likePost, fetchComments, addComment } from '../services/api';
+import { likePost, fetchComments, addComment, cleanImageUrl } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import GlobalImageViewer from './GlobalImageViewer';
 import ShareModal from './ShareModal';
@@ -151,7 +151,7 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                 >
                     <View style={styles.avatarContainer}>
                         {user.avatar ? (
-                            <Image source={{ uri: user.avatar }} style={styles.avatar} />
+                            <Image source={{ uri: cleanImageUrl(user.avatar) }} style={styles.avatar} />
                         ) : (
                             <View style={[styles.avatar, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, justifyContent: 'center', alignItems: 'center' }]}>
                                 <User size={20} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
@@ -197,7 +197,7 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                     onPress={handlePress}
                     style={styles.mediaContainer}
                 >
-                    <Image source={{ uri: image }} style={styles.media} resizeMode="cover" />
+                    <Image source={{ uri: cleanImageUrl(image) }} style={styles.media} resizeMode="cover" />
 
                     {/* Heart Animation Overlay */}
                     <Animated.View style={[
