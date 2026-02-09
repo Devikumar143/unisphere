@@ -8,7 +8,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Ensure uploads directory exists
-const uploadDir = 'uploads/';
+const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -348,7 +348,8 @@ router.post('/:id/avatar', upload.single('avatar'), async (req, res) => {
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        const protocol = req.get('x-forwarded-proto') || req.protocol;
+        const avatarUrl = `${protocol}://${req.get('host')}/uploads/${req.file.filename}`;
 
         // Get existing metadata
         const userRes = await query('SELECT bio_metadata FROM users WHERE id = $1', [id]);

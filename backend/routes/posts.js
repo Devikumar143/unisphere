@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Ensure uploads directory exists
-const uploadDir = 'uploads/';
+const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -174,7 +174,8 @@ router.post('/upload-media', upload.single('media'), async (req, res) => {
     }
 
     try {
-        const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        const protocol = req.get('x-forwarded-proto') || req.protocol;
+        const fileUrl = `${protocol}://${req.get('host')}/uploads/${req.file.filename}`;
         res.json({ url: fileUrl, type: req.file.mimetype });
     } catch (err) {
         console.error(err);

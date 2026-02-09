@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const uploadDir = 'uploads/';
+const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -30,11 +30,8 @@ router.post('/', upload.single('file'), (req, res) => {
 
     // Construct URL
     // Assuming API is hosted at root/api, but images served at root/uploads
-    const host = req.get('host');
-    const protocol = req.protocol;
-    const filename = req.file.filename;
-
     // Use full URL for robustness
+    const protocol = req.get('x-forwarded-proto') || req.protocol;
     const url = `${protocol}://${host}/uploads/${filename}`;
 
     res.json({ url });
