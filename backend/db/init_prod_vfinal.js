@@ -1,12 +1,12 @@
 const { Pool } = require('pg');
-
-const DATABASE_URL = "postgresql://unisphere_db_rkds_user:IA2gz5n09XXIwRnpPd3WUStEc0JPSd0U@dpg-d5cen3shg0os73e7e4mg-a.oregon-postgres.render.com/unisphere_db_rkds?ssl=true";
+require('dotenv').config();
+const DATABASE_URL = process.env.DATABASE_URL;
 
 const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
+  connectionString: DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 const createTablesQuery = `
@@ -20,7 +20,7 @@ const createTablesQuery = `
       logo_url TEXT
     );
 
-    -- 2. users (added password_hash)
+    -- 2. users (added password_hash, is_verified, sub info)
     CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       email VARCHAR(255) UNIQUE NOT NULL,
@@ -32,6 +32,9 @@ const createTablesQuery = `
       batch_year VARCHAR(10),
       bio_metadata JSONB DEFAULT '{}',
       university_id UUID REFERENCES universities(id),
+      is_verified BOOLEAN DEFAULT FALSE,
+      subscription_type VARCHAR(50) DEFAULT 'none',
+      subscription_expiry TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -199,33 +202,92 @@ const createTablesQuery = `
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- 18. Blocked Users
+    CREATE TABLE IF NOT EXISTS blocked_users (
+        blocker_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        blocked_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (blocker_id, blocked_id)
+    );
+
+    -- 19. User Reports
+    CREATE TABLE IF NOT EXISTS user_reports (
+        id SERIAL PRIMARY KEY,
+        reporter_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        reported_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        reason TEXT NOT NULL,
+        description TEXT,
+        status VARCHAR(20) DEFAULT 'PENDING',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 20. Muted Chats
+    CREATE TABLE IF NOT EXISTS muted_chats (
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        chat_target_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        community_id UUID REFERENCES communities(id) ON DELETE CASCADE,
+        muted_until TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT unique_mute_dm UNIQUE (user_id, chat_target_id),
+        CONSTRAINT unique_mute_community UNIQUE (user_id, community_id),
+        CONSTRAINT chat_target_check CHECK (
+            (chat_target_id IS NOT NULL AND community_id IS NULL) OR 
+            (chat_target_id IS NULL AND community_id IS NOT NULL)
+        )
+    );
+
+    -- 21. Verification Requests
+    CREATE TABLE IF NOT EXISTS verification_requests (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        full_name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        document_url TEXT,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- 22. Subscriptions History
+    CREATE TABLE IF NOT EXISTS subscriptions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        amount DECIMAL(10, 2) NOT NULL,
+        status TEXT DEFAULT 'active',
+        started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
 `;
 
 async function run() {
-    try {
-        console.log('--- RE-INITIALIZING PRODUCTION DATABASE ---');
+  try {
+    console.log('--- RE-INITIALIZING PRODUCTION DATABASE ---');
 
-        // 1. Drop existing tables safely (optional but recommended for unification)
-        const tablesToDrop = [
-            'chat_preferences', 'saved_messages', 'stories', 'signed_prekeys',
-            'prekeys', 'identity_keys', 'notifications', 'follows', 'comments',
-            'likes', 'chat_messages', 'community_members', 'posts', 'communities',
-            'users', 'universities', 'ads'
-        ];
+    // 1. Drop existing tables safely (optional but recommended for unification)
+    const tablesToDrop = [
+      'chat_preferences', 'saved_messages', 'stories', 'signed_prekeys',
+      'prekeys', 'identity_keys', 'notifications', 'follows', 'comments',
+      'likes', 'chat_messages', 'community_members', 'posts', 'communities',
+      'users', 'universities', 'ads', 'subscriptions', 'blocked_users',
+      'user_reports', 'muted_chats', 'verification_requests'
+    ];
 
-        console.log('Dropping existing tables for clean schema unification...');
-        for (const table of tablesToDrop) {
-            await pool.query(`DROP TABLE IF EXISTS ${table} CASCADE`);
-        }
+    console.log('Dropping existing tables for clean schema unification...');
+    for (const table of tablesToDrop) {
+      await pool.query(`DROP TABLE IF EXISTS ${table} CASCADE`);
+    }
 
-        // 2. Create tables
-        console.log('Creating unified schema...');
-        await pool.query(createTablesQuery);
-        console.log('✅ Final Schema created successfully.');
+    // 2. Create tables
+    console.log('Creating unified schema...');
+    await pool.query(createTablesQuery);
+    console.log('✅ Final Schema created successfully.');
 
-        // 3. Seed initial data
-        console.log('Seeding initial data...');
-        await pool.query(`
+    // 3. Seed initial data
+    console.log('Seeding initial data...');
+    await pool.query(`
             INSERT INTO ads (title, image_url, category) VALUES 
             ('Annual Tech Symposium 2026', 'https://images.unsplash.com/photo-1540575861501-7ad058177a33?q=80&w=2070', 'Event'),
             ('Join the University Photography Club', 'https://images.unsplash.com/photo-1452784444945-3f422708314e?q=80&w=2072', 'Announcement'),
@@ -235,15 +297,15 @@ async function run() {
             INSERT INTO universities (name, domain) VALUES ('UniSphere Global', 'unisphere.edu') 
             ON CONFLICT (domain) DO NOTHING;
         `);
-        console.log('✅ Seeding complete.');
+    console.log('✅ Seeding complete.');
 
-    } catch (err) {
-        console.error('❌ CRITICAL ERROR:', err);
-    } finally {
-        await pool.end();
-        console.log('--- DONE ---');
-        process.exit();
-    }
+  } catch (err) {
+    console.error('❌ CRITICAL ERROR:', err);
+  } finally {
+    await pool.end();
+    console.log('--- DONE ---');
+    process.exit();
+  }
 }
 
 run();
