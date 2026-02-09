@@ -35,32 +35,81 @@ router.get('/', async (req, res) => {
                 p.body as content, 
                 p.media_urls,
                 p.created_at,
+                u.id as author_id,
+                u.username,
                 u.full_name as user_name, 
                 u.role as user_role, 
                 u.department as user_dept,
                 u.bio_metadata,
+                u.is_verified,
                 (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as likes_count,
                 (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count,
-                ${currentUserId ? `(SELECT COUNT(*) > 0 FROM likes WHERE post_id = p.id AND user_id = $1) as is_liked` : 'false as is_liked'}
+                ${currentUserId ? `(SELECT COUNT(*) > 0 FROM likes WHERE post_id = p.id AND user_id = $1) as is_liked` : 'false as is_liked'},
+                p.community_id,
+                c.name as community_name
             FROM posts p
             JOIN users u ON p.author_id = u.id
+            LEFT JOIN communities c ON p.community_id = c.id
             ORDER BY p.created_at DESC
         `;
 
         const params = currentUserId ? [currentUserId] : [];
         const result = await query(sql, params);
 
+        // --- Shuffle-with-Bias Algorithm ---
+        const shuffleArray = (array) => {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        };
+
+        const now = new Date();
+        const oneDay = 24 * 60 * 60 * 1000;
+        const oneWeek = 7 * oneDay;
+
+        const buckets = {
+            today: [],
+            thisWeek: [],
+            older: []
+        };
+
+        result.rows.forEach(row => {
+            const postDate = new Date(row.created_at);
+            const diff = now - postDate;
+            if (diff < oneDay) {
+                buckets.today.push(row);
+            } else if (diff < oneWeek) {
+                buckets.thisWeek.push(row);
+            } else {
+                buckets.older.push(row);
+            }
+        });
+
+        const randomizedRows = [
+            ...shuffleArray(buckets.today),
+            ...shuffleArray(buckets.thisWeek),
+            ...shuffleArray(buckets.older)
+        ];
+        // ------------------------------------
+
         // Transform for frontend
-        const posts = result.rows.map(post => ({
+        const posts = randomizedRows.map(post => ({
             id: post.id,
             user: {
+                id: post.author_id,
+                username: post.username,
                 name: post.user_name,
                 role: `${post.user_role} • ${post.user_dept}`,
-                avatar: post.bio_metadata?.avatar || null
+                avatar: post.bio_metadata?.avatar || null,
+                isVerified: post.is_verified
             },
             content: post.content,
             image: post.media_urls && post.media_urls.length > 0 ? post.media_urls[0] : null,
             time: new Date(post.created_at).toLocaleDateString(),
+            community_name: post.community_name,
+            community_id: post.community_id,
             stats: {
                 likes: parseInt(post.likes_count),
                 comments: parseInt(post.comments_count),
@@ -118,38 +167,92 @@ const processMentions = async (content, senderId, entityId, type) => {
 };
 
 // Upload Image
-router.post('/upload-image', upload.single('image'), async (req, res) => {
+// Upload Media (Image/Video)
+router.post('/upload-media', upload.single('media'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
     }
 
     try {
         const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-        res.json({ imageUrl: fileUrl });
+        res.json({ url: fileUrl, type: req.file.mimetype });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to process upload' });
     }
 });
 
-// Create Post
+// Get Reels (Video Posts)
+router.get('/reels', async (req, res) => {
+    try {
+        const sql = `
+            SELECT 
+                p.id, 
+                p.body as description, 
+                p.media_urls,
+                p.created_at,
+                u.id as author_id,
+                u.username,
+                u.full_name as user_name,
+                u.bio_metadata,
+                u.is_verified,
+                p.views,
+                (SELECT COUNT(*) FROM likes WHERE post_id = p.id) as likes_count,
+                (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count,
+                 ${req.query.userId ? `(SELECT COUNT(*) > 0 FROM likes WHERE post_id = p.id AND user_id = $1) as is_liked` : 'false as is_liked'}
+            FROM posts p
+            JOIN users u ON p.author_id = u.id
+            WHERE p.content_type = 'Reel'
+            ORDER BY p.created_at DESC
+        `;
+        const params = req.query.userId ? [req.query.userId] : [];
+        const result = await query(sql, params);
+
+        const reels = result.rows.map(post => ({
+            id: post.id,
+            video: post.media_urls[0], // First URL is video
+            user: {
+                id: post.author_id,
+                username: post.username,
+                name: post.user_name,
+                avatar: post.bio_metadata?.avatar || `https://ui-avatars.com/api/?name=${post.user_name}&background=random`,
+                isVerified: post.is_verified
+            },
+            description: post.description,
+            views: post.views || 0,
+            likes: parseInt(post.likes_count),
+            comments: parseInt(post.comments_count),
+            isLiked: post.is_liked,
+            song: 'Original Audio' // Placeholder
+        }));
+
+        res.json(reels);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error fetching reels' });
+    }
+});
+
+// Create Post (Text or Reel)
 router.post('/', async (req, res) => {
-    const { userId, content, mediaUrl } = req.body;
-    if (!userId || !content) {
+    const { userId, content, mediaUrl, community_id, contentType = 'Text' } = req.body;
+    if (!userId) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
     try {
         const sql = `
-            INSERT INTO posts (author_id, content_type, body, media_urls)
-            VALUES ($1, 'Text', $2, $3)
+            INSERT INTO posts (author_id, content_type, body, media_urls, community_id)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *
         `;
-        const result = await query(sql, [userId, content, mediaUrl ? [mediaUrl] : []]);
+        const result = await query(sql, [userId, contentType, content || '', mediaUrl ? [mediaUrl] : [], community_id || null]);
         const post = result.rows[0];
 
         // Process Mentions
-        await processMentions(content, userId, post.id, 'MENTION');
+        if (content) {
+            await processMentions(content, userId, post.id, 'MENTION');
+        }
 
         res.json(post);
     } catch (err) {
@@ -317,6 +420,18 @@ router.delete('/:id', async (req, res) => {
         res.json({ success: true, message: 'Post deleted successfully' });
     } catch (err) {
         console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Increment View Count
+router.post('/:id/view', async (req, res) => {
+    const postId = req.params.id;
+    try {
+        await query('UPDATE posts SET views = COALESCE(views, 0) + 1 WHERE id = $1', [postId]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error incrementing view count:', err);
         res.status(500).json({ error: 'Server error' });
     }
 });

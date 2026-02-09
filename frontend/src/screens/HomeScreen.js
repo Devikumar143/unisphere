@@ -1,16 +1,17 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, Animated, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Animated, TouchableOpacity, RefreshControl, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SIZES } from '../constants/theme';
 
 import PostCard from '../components/PostCard';
+import AdCard from '../components/AdCard';
 import AdCarousel from '../components/AdCarousel';
 import { fetchPosts, deletePost, fetchAds } from '../services/api';
 import { useFocusEffect, useRoute, useNavigation } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../context/ThemeContext';
-import { Bell, PlusSquare, Camera, TrendingUp, Users, Calendar, Zap, Search } from 'lucide-react-native';
+import { Bell, PlusSquare, Camera, TrendingUp, Users, Calendar, Zap, Search, Heart, MessageCircle } from 'lucide-react-native';
 
 
 
@@ -22,7 +23,7 @@ const QUICK_ACTIONS = [
     { id: 'search', label: 'Search', icon: Search, color: '#5C677D' }, // Storm Blue
 ];
 
-export default function HomeScreen({ user, onOpenNotifications, onCreatePost }) {
+export default function HomeScreen({ user, onOpenNotifications, onOpenMessages, onCreatePost, onViewProfile }) {
     const { isDark, themeColors } = useTheme();
     const scrollY = useRef(new Animated.Value(0)).current;
     const navigation = useNavigation();
@@ -40,7 +41,7 @@ export default function HomeScreen({ user, onOpenNotifications, onCreatePost }) 
                 fetchPosts(user?.id),
                 fetchAds()
             ]);
-            setPosts(postsData);
+            setPosts(postsData.reverse()); // Newest posts first
             setAds(adsData);
         } catch (error) {
             console.error("Failed to load data", error);
@@ -121,7 +122,6 @@ export default function HomeScreen({ user, onOpenNotifications, onCreatePost }) 
             case 'trending':
             case 'events':
             case 'buddies':
-                // Show a "Coming Soon" toast
                 setToastMessage(`${id.charAt(0).toUpperCase() + id.slice(1)} coming soon! 🚀`);
                 setShowToast(true);
                 toastAnim.setValue(-100);
@@ -156,66 +156,63 @@ export default function HomeScreen({ user, onOpenNotifications, onCreatePost }) 
             )}
 
             <SafeAreaView style={styles.safeArea}>
-                <View style={styles.header}>
-                    <View style={styles.greetingSection}>
-                        <Text style={[styles.greetingText, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
-                            {getGreeting()},
-                        </Text>
-                        <Text style={[styles.userNameText, { color: isDark ? themeColors.textMain : themeColors.textMainLight, fontFamily: 'PlayfairDisplay-Bold' }]}>
-                            {user?.name?.split(' ')[0] || 'Viky'}
-                        </Text>
-                    </View>
+                <View style={[styles.header, { borderBottomWidth: 0.5, borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
+                    <Text style={[styles.logoText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
+                        UniSphere
+                    </Text>
 
                     <View style={styles.headerActions}>
                         <TouchableOpacity onPress={() => onCreatePost()} style={styles.headerActionBtn}>
-                            <View style={[styles.iconCircle, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, borderColor: themeColors.accentPrimary + '20' }]}>
-                                <PlusSquare color={themeColors.accentPrimary} size={22} />
-                            </View>
+                            <PlusSquare color={isDark ? themeColors.textMain : themeColors.textMainLight} size={24} />
                         </TouchableOpacity>
 
                         <TouchableOpacity onPress={onOpenNotifications} style={styles.headerActionBtn}>
-                            <View style={[styles.iconCircle, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, borderColor: themeColors.accentPrimary + '20' }]}>
-                                <Bell color={isDark ? themeColors.textMain : themeColors.textMainLight} size={22} />
-                                <View style={[styles.notificationDot, { backgroundColor: themeColors.accentPrimary }]} />
-                            </View>
+                            <Heart color={isDark ? themeColors.textMain : themeColors.textMainLight} size={24} />
+                            <View style={[styles.notificationDot, { backgroundColor: themeColors.accentPrimary }]} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={onOpenMessages} style={styles.headerActionBtn}>
+                            <MessageCircle color={isDark ? themeColors.textMain : themeColors.textMainLight} size={24} />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                <ScrollView
+                <Animated.ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColors.accentPrimary} />
                     }
+                    onScroll={Animated.event(
+                        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                        { useNativeDriver: true }
+                    )}
+                    scrollEventThrottle={16}
                 >
 
 
+                    {/* Stories Bar Placeholder */}
+
+
                     {/* Quick Actions Rail */}
-                    <View style={styles.quickActionsContainer}>
+                    <View style={styles.actionsWrapper}>
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.quickActionsContent}
+                            contentContainerStyle={styles.actionsContainer}
                         >
                             {QUICK_ACTIONS.map((action) => (
                                 <TouchableOpacity
                                     key={action.id}
-                                    style={styles.actionCardWrapper}
-                                    activeOpacity={0.7}
+                                    style={[styles.actionItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
                                     onPress={() => handleQuickAction(action.id)}
                                 >
-                                    <View style={[styles.actionCard, {
-                                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
-                                        borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
-                                    }]}>
-                                        <View style={[styles.actionIconContainer, { backgroundColor: action.color + '15' }]}>
-                                            <action.icon size={20} color={action.color} />
-                                        </View>
-                                        <Text style={[styles.actionLabel, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
-                                            {action.label}
-                                        </Text>
+                                    <View style={[styles.actionIconWrap, { backgroundColor: action.color + '20' }]}>
+                                        <action.icon size={20} color={action.color} />
                                     </View>
+                                    <Text style={[styles.actionLabel, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
+                                        {action.label}
+                                    </Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -238,20 +235,37 @@ export default function HomeScreen({ user, onOpenNotifications, onCreatePost }) 
                         ) : posts.length === 0 ? (
                             <Text style={[styles.emptyText, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>No posts yet. Be the first to share!</Text>
                         ) : (
-                            posts.map(post => (
-                                <PostCard
-                                    key={post.id}
-                                    {...post}
-                                    currentUser={user}
-                                    onDelete={handleDeletePost}
-                                />
-                            ))
+                            <>
+                                {posts.reduce((mixed, post, index) => {
+                                    mixed.push({ type: 'post', ...post });
+                                    // Inject ad after every 5th post (index 4, 9, 14...)
+                                    if ((index + 1) % 5 === 0 && ads.length > 0) {
+                                        const adIndex = Math.floor((index + 1) / 5) - 1;
+                                        if (ads[adIndex % ads.length]) {
+                                            mixed.push({ type: 'ad', ...ads[adIndex % ads.length] });
+                                        }
+                                    }
+                                    return mixed;
+                                }, []).map((item, idx) => (
+                                    item.type === 'ad' ? (
+                                        <AdCard key={`ad-${item.id}-${idx}`} ad={item} />
+                                    ) : (
+                                        <PostCard
+                                            key={`post-${item.id}-${idx}`}
+                                            {...item}
+                                            currentUser={user}
+                                            onDelete={handleDeletePost}
+                                            onViewProfile={onViewProfile}
+                                        />
+                                    )
+                                ))}
+                            </>
                         )}
                     </View>
 
                     {/* Bottom Padding for Navigation Bar */}
                     <View style={{ height: 100 }} />
-                </ScrollView>
+                </Animated.ScrollView>
             </SafeAreaView>
 
 
@@ -304,7 +318,10 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter-Bold',
     },
     safeArea: {
-        flex: 0,
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: 20,
     },
     auraContainer: {
         position: 'absolute',
@@ -319,112 +336,128 @@ const styles = StyleSheet.create({
         borderRadius: 200,
         opacity: 0.6,
     },
+    logoText: {
+        fontSize: 28,
+        fontFamily: 'PlayfairDisplay-Bold',
+        letterSpacing: -1,
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 16,
-    },
-    greetingSection: {
-        flex: 1,
-    },
-    greetingText: {
-        fontSize: 14,
-        fontWeight: '500',
-        letterSpacing: 0.2,
-        marginBottom: 2,
-    },
-    userNameText: {
-        fontSize: 24,
-        fontWeight: '800',
-        letterSpacing: -0.5,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
     },
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 20,
     },
     headerActionBtn: {
-        borderRadius: 20,
-        overflow: 'hidden',
-    },
-    iconCircle: {
-        width: 44,
-        height: 44,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 22,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
+        position: 'relative',
     },
     notificationDot: {
         position: 'absolute',
-        top: 12,
-        right: 12,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        borderWidth: 1.5,
-        borderColor: '#fff',
+        top: -2,
+        right: -2,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        borderWidth: 2,
+        borderColor: COLORS.bgDark,
     },
-    scrollContent: {
-        paddingTop: 10,
+    storiesWrapper: {
+        paddingVertical: 12,
+        borderBottomWidth: 0.5,
+        borderBottomColor: 'rgba(255,255,255,0.05)',
     },
     storiesContainer: {
-        marginBottom: 24,
-    },
-    storiesContent: {
-        paddingHorizontal: SIZES.padding,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: SIZES.padding,
-        marginBottom: 16,
-    },
-    sectionTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: COLORS.textMain,
-    },
-    quickActionsContainer: {
-        marginBottom: 24,
-    },
-    quickActionsContent: {
-        paddingHorizontal: 20,
-        gap: 12,
-    },
-    actionCardWrapper: {
-        borderRadius: 20,
-        overflow: 'hidden',
-    },
-    actionCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 10,
         paddingHorizontal: 16,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
     },
-    actionIconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
+    storyItem: {
+        alignItems: 'center',
+        marginRight: 16,
+        width: 72,
+    },
+    storyCircle: {
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        padding: 3,
+        position: 'relative',
+    },
+    storyGradient: {
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        padding: 3,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    storyAvatarWrap: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 31,
+        borderWidth: 2,
+        overflow: 'hidden',
+    },
+    storyAvatar: {
+        width: '100%',
+        height: '100%',
+    },
+    addStoryBtn: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: 2,
+        borderColor: COLORS.bgDark,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    addStoryPlus: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginTop: -1,
+    },
+    storyName: {
+        fontSize: 11,
+        marginTop: 6,
+        textAlign: 'center',
+    },
+    actionsWrapper: {
+        paddingVertical: 14,
+        borderBottomWidth: 0.5,
+        borderBottomColor: 'rgba(255,255,255,0.05)',
+    },
+    actionsContainer: {
+        paddingHorizontal: 16,
+    },
+    actionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
         marginRight: 10,
     },
+    actionIconWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 8,
+    },
     actionLabel: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '700',
-        letterSpacing: -0.2,
     },
     feed: {
-        paddingHorizontal: SIZES.padding,
+        paddingHorizontal: 0, // Instagram feed is full width
         minHeight: 200,
     },
     emptyText: {

@@ -1,21 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity, Modal, TextInput, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Share, Animated, Dimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Trash, AlertTriangle, Clock, User, CheckCircle2 } from 'lucide-react-native';
+import { Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Trash, AlertTriangle, Clock, User, CheckCircle2, Bookmark, BadgeCheck } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, GLASS, SIZES, SHADOWS } from '../constants/theme';
 import { likePost, fetchComments, addComment } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
+import GlobalImageViewer from './GlobalImageViewer';
+import ShareModal from './ShareModal';
 
 const { width } = Dimensions.get('window');
 
-export default function PostCard({ id, user = {}, content = '', image, stats = {}, time, currentUser, onDelete, onViewProfile }) {
+export default function PostCard({ id, user = {}, content = '', image, stats = {}, time, currentUser, onDelete, onViewProfile, community_name, community_id, style }) {
     const { isDark, themeColors } = useTheme();
     const [likes, setLikes] = useState(stats?.likes || 0);
     const [isLiked, setIsLiked] = useState(stats?.isLiked || false);
     const [commentsCount, setCommentsCount] = useState(stats?.comments || 0);
     const [lastTap, setLastTap] = useState(0);
+    const [viewerVisible, setViewerVisible] = useState(false);
     const heartAnim = useRef(new Animated.Value(0)).current;
+    const tapTimer = useRef(null);
 
     // Sync state
     useEffect(() => {
@@ -52,10 +56,16 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
         }
     };
 
-    const handleDoubleTap = () => {
+    const handlePress = () => {
         const now = Date.now();
         const DOUBLE_TAP_DELAY = 300;
+
         if (lastTap && (now - lastTap) < DOUBLE_TAP_DELAY) {
+            // It's a double tap!
+            if (tapTimer.current) {
+                clearTimeout(tapTimer.current);
+                tapTimer.current = null;
+            }
             if (!isLiked) handleLike();
 
             // Big Heart Animation
@@ -76,7 +86,13 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
             ]).start();
             setLastTap(0);
         } else {
+            // First tap or tap after delay
             setLastTap(now);
+            // Wait to see if it's a double tap
+            tapTimer.current = setTimeout(() => {
+                setViewerVisible(true);
+                tapTimer.current = null;
+            }, DOUBLE_TAP_DELAY);
         }
     };
 
@@ -107,14 +123,9 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
     };
 
     // Share Logic
-    const handleShare = async () => {
-        try {
-            await Share.share({
-                message: `Check out this post on UniSphere: ${content}`,
-            });
-        } catch (error) {
-            console.error(error);
-        }
+    const [shareModalVisible, setShareModalVisible] = useState(false);
+    const handleShare = () => {
+        setShareModalVisible(true);
     };
 
     const handleDelete = () => {
@@ -126,7 +137,11 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
     const [isDeleting, setIsDeleting] = useState(false); // If specific deleting state needed
 
     return (
-        <View style={[styles.card, { backgroundColor: themeColors.bgCard, borderColor: themeColors.border }]}>
+        <View style={[
+            styles.card,
+            { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight },
+            style
+        ]}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity
@@ -138,42 +153,48 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                         {user.avatar ? (
                             <Image source={{ uri: user.avatar }} style={styles.avatar} />
                         ) : (
-                            <View style={[styles.avatar, { backgroundColor: isDark ? themeColors.bgDark : themeColors.sand, justifyContent: 'center', alignItems: 'center' }]}>
+                            <View style={[styles.avatar, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, justifyContent: 'center', alignItems: 'center' }]}>
                                 <User size={20} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
                             </View>
                         )}
                     </View>
                     <View style={styles.userText}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={[styles.userName, {
-                                color: isDark ? themeColors.textMain : themeColors.textMainLight,
-                                fontFamily: 'PlayfairDisplay-Bold'
-                            }]}>
+                            <Text style={[styles.userName, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
                                 {user.name || 'Anonymous user'}
                             </Text>
                             {user.role === 'admin' && <CheckCircle2 size={12} color={themeColors.accentPrimary} style={{ marginLeft: 4 }} />}
+                            {user.isVerified ? (
+                                <BadgeCheck size={14} color="#FFD700" style={{ marginLeft: 4 }} />
+                            ) : user.subscriptionType === 'blue' ? (
+                                <BadgeCheck size={14} color="#4B9CD3" style={{ marginLeft: 4 }} />
+                            ) : null}
                         </View>
-                        <Text style={[styles.userRole, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
-                            {user.role || 'Member'} • {time}
-                        </Text>
+                        {community_name && (
+                            <View style={[styles.communityBadge, { backgroundColor: isDark ? 'rgba(37, 99, 235, 0.15)' : 'rgba(37, 99, 235, 0.1)' }]}>
+                                <Text style={[styles.communityBadgeText, { color: '#2563EB' }]}>
+                                    Posted in {community_name}
+                                </Text>
+                            </View>
+                        )}
+                        {user.location && !community_name && (
+                            <Text style={[styles.userLocation, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
+                                {user.location}
+                            </Text>
+                        )}
                     </View>
                 </TouchableOpacity>
 
-                {/* More Options */}
-                {/* Delete Option (Owner Only) */}
-                <TouchableOpacity
-                    style={styles.moreBtn}
-                    onPress={() => setShowDeleteConfirm(true)}
-                >
-                    <MoreHorizontal size={20} color={isDark ? themeColors.textDim : themeColors.textDimLight} />
+                <TouchableOpacity style={styles.moreBtn} onPress={() => setShowDeleteConfirm(true)}>
+                    <MoreHorizontal size={20} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
                 </TouchableOpacity>
             </View>
 
-            {/* Media (Instagram Style - Middle) */}
+            {/* Media Area */}
             {image && (
                 <TouchableOpacity
                     activeOpacity={0.95}
-                    onPress={handleDoubleTap}
+                    onPress={handlePress}
                     style={styles.mediaContainer}
                 >
                     <Image source={{ uri: image }} style={styles.media} resizeMode="cover" />
@@ -186,65 +207,67 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                             transform: [{ scale: heartAnim }]
                         }
                     ]}>
-                        <View style={[styles.heartBlur, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                            <Heart size={80} color={themeColors.error} fill={themeColors.error} />
-                        </View>
+                        <Heart size={80} color="#FFF" fill="#FFF" />
                     </Animated.View>
                 </TouchableOpacity>
             )}
 
-            {/* Footer / Actions (Instagram Style - Below Media) */}
+            {/* Footer / Actions */}
             <View style={styles.footer}>
                 <View style={styles.actionRow}>
                     <View style={styles.leftActions}>
                         <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
                             <Heart
-                                size={28}
-                                color={isLiked ? themeColors.error : (isDark ? themeColors.textMain : themeColors.textMainLight)}
-                                fill={isLiked ? themeColors.error : 'transparent'}
+                                size={24}
+                                color={isLiked ? '#ED4956' : (isDark ? themeColors.textMain : themeColors.textMainLight)}
+                                fill={isLiked ? '#ED4956' : 'transparent'}
                             />
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.actionBtn} onPress={handleOpenComments}>
-                            <MessageCircle size={28} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
+                            <MessageCircle size={24} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
-                            <Share2 size={26} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
+                            <Share2 size={24} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
                         </TouchableOpacity>
                     </View>
 
-                    {/* Save or other right action could go here */}
+                    <TouchableOpacity style={styles.actionBtn}>
+                        <Bookmark size={24} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
+                    </TouchableOpacity>
                 </View>
 
-                {/* Likes Counter */}
-                <TouchableOpacity activeOpacity={0.8}>
+                {/* Likes display */}
+                {likes > 0 && (
                     <Text style={[styles.likesCountText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
                         {likes.toLocaleString()} {likes === 1 ? 'like' : 'likes'}
                     </Text>
-                </TouchableOpacity>
+                )}
 
-                {/* Caption / Content (Instagram Style - Below Actions) */}
+                {/* Caption Block */}
                 {content ? (
                     <View style={styles.captionContainer}>
-                        <Text style={[styles.captionText, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]} numberOfLines={3}>
+                        <Text style={[styles.captionContent, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
                             <Text style={styles.captionUser}>{user.name || 'User'} </Text>
                             {content}
                         </Text>
                     </View>
                 ) : null}
 
-                {/* Comments Link */}
-                <TouchableOpacity onPress={handleOpenComments}>
-                    <Text style={[styles.viewCommentsLink, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>
-                        {commentsCount > 0 ? `View all ${commentsCount} comments` : 'Add a comment...'}
+                {/* Bottom Row: View Comments & Timestamp */}
+                <View style={styles.bottomRow}>
+                    {commentsCount > 0 && (
+                        <TouchableOpacity onPress={handleOpenComments} style={{ marginBottom: 4 }}>
+                            <Text style={[styles.viewCommentsLink, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
+                                View all {commentsCount} comments
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                    <Text style={[styles.timeAgo, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
+                        {time.toUpperCase()}
                     </Text>
-                </TouchableOpacity>
-
-                {/* Timestamp */}
-                <Text style={[styles.timeAgo, { color: isDark ? themeColors.textDim : themeColors.textDimLight }]}>
-                    {time.toUpperCase()}
-                </Text>
+                </View>
             </View>
 
             {/* Comments Modal */}
@@ -358,20 +381,39 @@ export default function PostCard({ id, user = {}, content = '', image, stats = {
                     </View>
                 </View>
             </Modal>
-        </View >
+
+            {/* Global Image Viewer */}
+            <GlobalImageViewer
+                visible={viewerVisible}
+                imageUrl={image}
+                onClose={() => setViewerVisible(false)}
+            />
+            {/* Share Modal */}
+            <ShareModal
+                visible={shareModalVisible}
+                onClose={() => setShareModalVisible(false)}
+                currentUser={currentUser}
+                post={{
+                    id,
+                    user,
+                    content,
+                    image
+                }}
+            />
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     card: {
-        marginBottom: 30, // More breathing room
-        borderRadius: 0, // Insta feed posts are edge-to-edge usually, but we'll stick to slightly rounded for UniSphere
-        backgroundColor: 'transparent', // Let it blend with the main background
+        marginBottom: 20,
+        width: '100%',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
         justifyContent: 'space-between',
     },
     userInfo: {
@@ -380,32 +422,48 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     avatarContainer: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         overflow: 'hidden',
-        marginRight: 12,
+        marginRight: 10,
+        borderWidth: 0.5,
+        borderColor: 'rgba(0,0,0,0.1)',
     },
     avatar: {
         width: '100%',
         height: '100%',
+        borderRadius: 16,
     },
     userText: {
         justifyContent: 'center',
     },
     userName: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '700',
     },
-    userRole: {
+    userLocation: {
+        fontSize: 12,
+        fontWeight: '400',
+    },
+    communityBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        marginTop: 4,
+        alignSelf: 'flex-start',
+    },
+    communityBadgeText: {
         fontSize: 11,
-        fontWeight: '500',
-        marginTop: 2,
+        fontWeight: '600',
+    },
+    moreBtn: {
+        padding: 4,
     },
     mediaContainer: {
         width: '100%',
-        aspectRatio: 1, // Instagram square default
-        backgroundColor: '#000',
+        aspectRatio: 1, // Traditional IG square aspect ratio
+        backgroundColor: 'rgba(0,0,0,0.02)',
         position: 'relative',
         justifyContent: 'center',
         alignItems: 'center',
@@ -419,55 +477,50 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    heartBlur: {
-        padding: 20,
-        borderRadius: 60,
-        overflow: 'hidden',
-    },
     footer: {
-        paddingHorizontal: 16,
-        paddingBottom: 16,
+        paddingHorizontal: 12,
         paddingTop: 12,
+        paddingBottom: 8,
     },
     actionRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     leftActions: {
         flexDirection: 'row',
         gap: 16,
     },
     actionBtn: {
-        justifyContent: 'center',
-        alignItems: 'center',
+        // Just padding for better touch area
     },
     likesCountText: {
         fontSize: 14,
-        fontWeight: '800',
+        fontWeight: '700',
         marginBottom: 6,
     },
     captionContainer: {
+        flexDirection: 'row',
         marginBottom: 6,
     },
-    captionText: {
+    captionContent: {
         fontSize: 14,
-        lineHeight: 20,
+        lineHeight: 18,
     },
     captionUser: {
-        fontWeight: '800',
-        fontFamily: 'PlayfairDisplay-Bold',
+        fontWeight: '700',
+    },
+    bottomRow: {
+        marginTop: 2,
     },
     viewCommentsLink: {
         fontSize: 14,
-        fontWeight: '500',
-        marginBottom: 4,
     },
     timeAgo: {
         fontSize: 10,
-        fontWeight: '600',
         letterSpacing: 0.2,
+        marginTop: 4,
     },
 
     // Comments Modal

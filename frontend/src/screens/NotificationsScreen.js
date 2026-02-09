@@ -7,6 +7,7 @@ import { BlurView } from 'expo-blur';
 import { ArrowLeft, Heart, MessageCircle, UserPlus, Bell, User } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead } from '../services/api';
+import soundService from '../services/soundService';
 
 export default function NotificationsScreen({ user, onBack, onViewPost, onViewProfile }) {
     const { isDark, themeColors } = useTheme();
@@ -31,6 +32,9 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
     };
 
     const handleNotificationPress = async (notification) => {
+        // Premium Feedback
+        soundService.playClink();
+
         // Mark as read locally
         if (!notification.is_read) {
             setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
@@ -42,21 +46,17 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
         if (notification.type === 'FOLLOW') {
             // Fetch basic user data stub and navigate
             onViewProfile && onViewProfile({ id: notification.sender_id });
-        } else if (notification.type === 'LIKE' || notification.type === 'COMMENT') {
-            // Need to fetch post or navigate to it. Assuming onViewPost takes post ID
-            // Ideally we'd pass the post object, but we might only have ID here.
-            // For MVP, we might just view the user who liked/commented if posts aren't easily deep-linked yet
-            // OR if onViewPost can handle ID fetch. Let's assume user Nav for simplicity or implement post modal later.
-            // Better UX: View the Sender Profile for now if Post Viewer isn't ready for IDs.
-            // Wait, PostCard expects full post object.
-            // Let's stick to Viewing Profile of interactor for now to avoid crashes, 
-            // OR fetch post details. Let's verify if we have getPostById. We don't.
-            // Fallback to viewing profile.
+        } else if (notification.type === 'LIKE' || notification.type === 'COMMENT' || notification.type === 'MENTION') {
+            // View the interactor's profile
             onViewProfile && onViewProfile({ id: notification.sender_id });
+        } else if (notification.type === 'VERIFICATION_UPDATE') {
+            // Go to settings to see status
+            onBack && onBack();
         }
     };
 
     const handleMarkAllRead = async () => {
+        soundService.triggerHaptic('success');
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         await markAllNotificationsRead(user.id);
     };
@@ -66,6 +66,8 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
             case 'LIKE': return <Heart size={20} color={COLORS.accentError} fill={COLORS.accentError} />;
             case 'COMMENT': return <MessageCircle size={20} color={COLORS.accentPrimary} fill={COLORS.accentPrimary} />;
             case 'FOLLOW': return <UserPlus size={20} color={COLORS.accentSuccess} />;
+            case 'MENTION': return <Bell size={20} color={COLORS.accentSecondary} fill={COLORS.accentSecondary} />;
+            case 'VERIFICATION_UPDATE': return <Bell size={20} color={COLORS.accentPrimary} fill={COLORS.accentPrimary} />;
             default: return <Bell size={20} color={isDark ? themeColors.textDim : themeColors.textDimLight} />;
         }
     };
@@ -77,6 +79,8 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
             case 'LIKE': return <Text style={{ color: textColor }}><Text style={{ fontWeight: 'bold' }}>{name}</Text> liked your post.</Text>;
             case 'COMMENT': return <Text style={{ color: textColor }}><Text style={{ fontWeight: 'bold' }}>{name}</Text> commented on your post.</Text>;
             case 'FOLLOW': return <Text style={{ color: textColor }}><Text style={{ fontWeight: 'bold' }}>{name}</Text> started following you.</Text>;
+            case 'MENTION': return <Text style={{ color: textColor }}><Text style={{ fontWeight: 'bold' }}>{name}</Text> mentioned you in a post.</Text>;
+            case 'VERIFICATION_UPDATE': return <Text style={{ color: textColor }}>Your verification request has been updated.</Text>;
             default: return <Text style={{ color: textColor }}>New notification.</Text>;
         }
     };
@@ -98,19 +102,21 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
 
             <SafeAreaView style={styles.safeArea}>
                 {/* Floating Header */}
-                <View style={[styles.headerGlass, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]} activeOpacity={0.7}>
-                            <ArrowLeft color={isDark ? themeColors.textMain : themeColors.textMainLight} size={22} />
-                        </TouchableOpacity>
-                        <Text style={[styles.title, {
-                            color: isDark ? themeColors.textMain : themeColors.textMainLight,
-                            fontFamily: 'PlayfairDisplay-Bold'
-                        }]}>Activity</Text>
-                        <TouchableOpacity onPress={handleMarkAllRead} style={styles.readAllBtn} activeOpacity={0.7}>
-                            <Text style={[styles.readAll, { color: themeColors.accentPrimary }]}>Mark All</Text>
-                        </TouchableOpacity>
-                    </View>
+                <View style={styles.headerSpacer}>
+                    <BlurView intensity={25} tint={isDark ? "dark" : "light"} style={styles.headerPill}>
+                        <View style={styles.header}>
+                            <TouchableOpacity onPress={onBack} style={[styles.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]} activeOpacity={0.7}>
+                                <ArrowLeft color={isDark ? themeColors.textMain : themeColors.textMainLight} size={20} />
+                            </TouchableOpacity>
+                            <Text style={[styles.title, {
+                                color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                fontFamily: 'PlayfairDisplay-Bold'
+                            }]}>Activity</Text>
+                            <TouchableOpacity onPress={handleMarkAllRead} style={styles.readAllBtn} activeOpacity={0.7}>
+                                <Text style={[styles.readAll, { color: themeColors.accentPrimary }]}>Mark All</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </BlurView>
                 </View>
 
                 {loading ? (
@@ -142,13 +148,15 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
 
                             return (
                                 <TouchableOpacity style={styles.itemWrapper} onPress={() => handleNotificationPress(item)} activeOpacity={0.7}>
-                                    <View style={[styles.itemGlass, {
-                                        backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
-                                        borderColor: item.is_read ? 'transparent' : themeColors.accentPrimary + '20'
-                                    }]}>
+                                    <BlurView intensity={item.is_read ? 15 : 30} tint={isDark ? "dark" : "light"} style={[
+                                        styles.itemGlass,
+                                        {
+                                            borderColor: item.is_read ? 'rgba(255,255,255,0.05)' : themeColors.accentPrimary + '30'
+                                        }
+                                    ]}>
                                         <View style={styles.row}>
                                             <View style={styles.avatarContainer}>
-                                                <View style={[styles.avatarGlow, { backgroundColor: item.is_read ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') : themeColors.accentPrimary }]}>
+                                                <View style={[styles.avatarGlow, { backgroundColor: item.is_read ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)') : themeColors.accentPrimary + '30' }]}>
                                                     {item.sender_avatar ? (
                                                         <Image source={{ uri: item.sender_avatar }} style={styles.avatar} />
                                                     ) : (
@@ -157,7 +165,7 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
                                                         </View>
                                                     )}
                                                 </View>
-                                                <View style={[styles.iconBadge, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]}>
+                                                <View style={[styles.iconBadge, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgLight, borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }]}>
                                                     {renderIcon(item.type)}
                                                 </View>
                                             </View>
@@ -167,7 +175,7 @@ export default function NotificationsScreen({ user, onBack, onViewPost, onViewPr
                                             </View>
                                             {!item.is_read && <View style={[styles.dot, { backgroundColor: themeColors.accentPrimary }]} />}
                                         </View>
-                                    </View>
+                                    </BlurView>
                                 </TouchableOpacity>
                             );
                         }}
@@ -191,39 +199,34 @@ const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
     },
-    headerGlass: {
-        borderBottomWidth: 0.5,
-        borderBottomColor: 'rgba(255,255,255,0.1)',
+    headerSpacer: {
+        paddingHorizontal: 20,
+        paddingTop: 14,
+        paddingBottom: 6,
+    },
+    headerPill: {
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: SIZES.padding,
-        paddingVertical: 14,
-        paddingTop: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
     },
     backBtn: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.08)',
-        overflow: 'hidden',
-    },
-    btnHighlight: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderRadius: 21,
-        borderWidth: 1,
-        pointerEvents: 'none',
     },
     title: {
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: '900',
         letterSpacing: -0.5,
     },
@@ -231,8 +234,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     readAll: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 13,
+        fontWeight: '700',
     },
     list: {
         paddingVertical: 10,
@@ -242,7 +245,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     itemGlass: {
-        borderRadius: 20,
+        borderRadius: 24,
         overflow: 'hidden',
         borderWidth: 1,
         padding: 14,

@@ -157,7 +157,10 @@ router.get('/:id/posts', async (req, res) => {
                 p.body as content, 
                 p.media_urls,
                 p.created_at,
+                p.community_id,
+                c.name as community_name,
                 u.id as user_id,
+                u.username,
                 u.full_name as user_name, 
                 u.role as user_role, 
                 u.department as user_dept,
@@ -167,6 +170,7 @@ router.get('/:id/posts', async (req, res) => {
                 ${currentUserId ? `(SELECT COUNT(*) > 0 FROM likes WHERE post_id = p.id AND user_id = $2) as is_liked` : 'false as is_liked'}
             FROM posts p
             JOIN users u ON p.author_id = u.id
+            LEFT JOIN communities c ON p.community_id = c.id
             WHERE p.community_id = $1
             ORDER BY p.created_at DESC
         `;
@@ -178,6 +182,7 @@ router.get('/:id/posts', async (req, res) => {
             id: post.id,
             user: {
                 id: post.user_id,
+                username: post.username,
                 name: post.user_name,
                 role: `${post.user_role} • ${post.user_dept}`,
                 avatar: post.bio_metadata?.avatar || null
@@ -185,6 +190,8 @@ router.get('/:id/posts', async (req, res) => {
             content: post.content,
             image: post.media_urls && post.media_urls.length > 0 ? post.media_urls[0] : null,
             time: new Date(post.created_at).toLocaleDateString(),
+            community_id: post.community_id,
+            community_name: post.community_name,
             stats: {
                 likes: parseInt(post.likes_count),
                 comments: parseInt(post.comments_count),
@@ -312,6 +319,25 @@ router.post('/:id/unpin', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error unpinning message' });
+    }
+});
+
+// Get Community Members (for mentions)
+router.get('/:id/members', async (req, res) => {
+    const communityId = req.params.id;
+    try {
+        const sql = `
+            SELECT u.id, u.full_name as name, u.username, u.bio_metadata->>'avatar' as avatar
+            FROM community_members cm
+            JOIN users u ON cm.user_id = u.id
+            WHERE cm.community_id = $1
+            ORDER BY u.full_name ASC
+        `;
+        const result = await query(sql, [communityId]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error fetching community members:', err);
+        res.status(500).json({ error: 'Server error fetching members' });
     }
 });
 

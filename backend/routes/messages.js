@@ -142,14 +142,19 @@ router.get('/:userId/:otherUserId', async (req, res) => {
 
     try {
         const sql = `
-            SELECT id, sender_id, recipient_id, message, reactions, sent_at, 
-                   read_at, delivered_at, reply_to_message_id, message_type,
-                   voice_url, voice_duration, is_deleted, attachment_urls
-            FROM chat_messages
-            WHERE ((sender_id = $1 AND recipient_id = $2)
-               OR (sender_id = $2 AND recipient_id = $1))
-               AND (is_deleted IS FALSE OR is_deleted IS NULL)
-            ORDER BY sent_at ASC
+            SELECT cm.id, cm.sender_id, cm.recipient_id, cm.message, cm.reactions, cm.sent_at, 
+                   cm.read_at, cm.delivered_at, cm.reply_to_message_id, cm.message_type,
+                   cm.voice_url, cm.voice_duration, cm.is_deleted, cm.attachment_urls, cm.poll_data,
+                   original.message as reply_to_content,
+                   original.sender_id as reply_to_sender_id,
+                   u_orig.full_name as reply_to_sender_name
+            FROM chat_messages cm
+            LEFT JOIN chat_messages original ON cm.reply_to_message_id = original.id
+            LEFT JOIN users u_orig ON original.sender_id = u_orig.id
+            WHERE ((cm.sender_id = $1 AND cm.recipient_id = $2)
+               OR (cm.sender_id = $2 AND cm.recipient_id = $1))
+               AND (cm.is_deleted IS FALSE OR cm.is_deleted IS NULL)
+            ORDER BY cm.sent_at ASC
         `;
 
         const result = await query(sql, [userId, otherUserId]);
@@ -164,7 +169,14 @@ router.get('/:userId/:otherUserId', async (req, res) => {
             readAt: row.read_at,
             deliveredAt: row.delivered_at,
             replyTo: row.reply_to_message_id,
+            replyToDetails: row.reply_to_message_id ? {
+                id: row.reply_to_message_id,
+                content: row.reply_to_content,
+                senderId: row.reply_to_sender_id,
+                senderName: row.reply_to_sender_name
+            } : null,
             messageType: row.message_type,
+            pollData: row.poll_data,
             voiceUrl: row.voice_url,
             voiceDuration: row.voice_duration,
             attachmentUrls: row.attachment_urls,
@@ -233,8 +245,8 @@ router.post('/:messageId/forward', async (req, res) => {
 
         // Create forwarded message
         const insertSql = `
-            INSERT INTO chat_messages (sender_id, recipient_id, message, message_type, voice_url, voice_duration, attachment_urls)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO chat_messages (sender_id, recipient_id, message, message_type, voice_url, voice_duration, attachment_urls, poll_data)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
         `;
         const result = await query(insertSql, [
@@ -244,7 +256,8 @@ router.post('/:messageId/forward', async (req, res) => {
             originalMessage.message_type,
             originalMessage.voice_url,
             originalMessage.voice_duration,
-            originalMessage.attachment_urls
+            originalMessage.attachment_urls,
+            originalMessage.poll_data
         ]);
 
         res.json({ success: true, message: result.rows[0] });
@@ -284,6 +297,31 @@ router.put('/:messageId', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error editing message' });
+    }
+});
+
+// Clear chat (delete all messages between two users)
+router.delete('/clear/:userId/:otherUserId', async (req, res) => {
+    const { userId, otherUserId } = req.params;
+
+    try {
+        const sql = `
+            UPDATE chat_messages 
+            SET is_deleted = TRUE 
+            WHERE ((sender_id = $1 AND recipient_id = $2)
+               OR (sender_id = $2 AND recipient_id = $1))
+            RETURNING id
+        `;
+        const result = await query(sql, [userId, otherUserId]);
+
+        res.json({
+            success: true,
+            deletedCount: result.rows.length,
+            message: 'Chat cleared successfully'
+        });
+    } catch (err) {
+        console.error('Error clearing chat:', err);
+        res.status(500).json({ error: 'Server error clearing chat' });
     }
 });
 

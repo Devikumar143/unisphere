@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, FlatList, TouchableOpacity, ActivityIndicator, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { Search, Users, MessageSquare } from 'lucide-react-native';
+import { Search, Users, MessageSquare, ArrowLeft } from 'lucide-react-native';
 import { COLORS, SIZES, GLASS } from '../constants/theme';
 import PremiumConversationTile from '../components/PremiumConversationTile';
 import { useTheme } from '../context/ThemeContext';
@@ -12,7 +12,7 @@ import { onUserOnline, onUserOffline, offUserOnline, offUserOffline } from '../s
 
 const { width } = Dimensions.get('window');
 
-export default function MessagesScreen({ user, onOpenChat }) {
+export default function MessagesScreen({ user, onOpenChat, onBack }) {
     const { themeColors, isDark } = useTheme();
     const [conversations, setConversations] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -60,10 +60,15 @@ export default function MessagesScreen({ user, onOpenChat }) {
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.header}>
                     <View style={styles.headerTop}>
-                        <Text style={[styles.headerTitle, {
-                            color: isDark ? themeColors.textMain : themeColors.textMainLight,
-                            fontFamily: 'PlayfairDisplay-Bold'
-                        }]}>Messages</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <TouchableOpacity onPress={onBack} style={{ marginRight: 15 }}>
+                                <ArrowLeft size={24} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
+                            </TouchableOpacity>
+                            <Text style={[styles.headerTitle, {
+                                color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                fontFamily: 'PlayfairDisplay-Bold'
+                            }]}>Messages</Text>
+                        </View>
                         <TouchableOpacity style={[styles.iconBtn, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, borderColor: themeColors.accentPrimary + '15', borderWidth: 1 }]}>
                             <Users size={20} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
                         </TouchableOpacity>

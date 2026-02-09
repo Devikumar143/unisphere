@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { User, Mail, Lock, BookOpen, ArrowRight, AtSign, Eye, EyeOff } from 'lucide-react-native';
 import { COLORS, SIZES } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
-import { registerUser } from '../services/api';
+import { registerUser, loginUser } from '../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -28,6 +28,7 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
         username: '',
         email: '',
         department: '',
+        password: '', // Added password field to tracking
     });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -35,9 +36,15 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
 
     const handleRegister = async () => {
         const { fullName, email, password, department, username } = formData;
+        console.log('[Register] Attempting registration for:', username);
 
         if (!fullName || !email || !password || !department || !username) {
             setError('Please fill in all details to join UniSphere.');
+            return;
+        }
+
+        if (!email.toLowerCase().endsWith('@joyuniversity.edu.in')) {
+            setError('Only @joyuniversity.edu.in emails are allowed.');
             return;
         }
 
@@ -45,11 +52,21 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
         setError('');
 
         try {
-            const data = await registerUser(formData);
-            onRegister(data.user);
+            await registerUser(formData);
+            console.log('[Register] Registration success, logging in...');
+
+            // Auto Login
+            const loginData = await loginUser(formData.email, formData.password);
+
+            console.log('[Register] Login success, starting session...');
+            if (typeof onRegister === 'function') {
+                // Pass the full user object with token
+                onRegister({ ...loginData.user, token: loginData.token });
+            }
         } catch (err) {
+            console.error('[Register] Error:', err);
             setError(err.message || 'Registration failed');
-            Alert.alert("Registration Error", err.message);
+            Alert.alert("Registration Error", err.message || "An unexpected error occurred.");
         } finally {
             setLoading(false);
         }
@@ -106,7 +123,7 @@ export default function RegisterScreen({ onRegister, onBackToLogin }) {
                         <InputField
                             label="University Email"
                             icon={Mail}
-                            placeholder="name@university.edu"
+                            placeholder="name@joyuniversity.edu.in"
                             keyboardType="email-address"
                             value={formData.email}
                             onChangeText={(v) => updateField('email', v)}

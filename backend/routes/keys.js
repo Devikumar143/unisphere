@@ -2,6 +2,58 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
+// Unified key registration endpoint (Frontend sends all at once)
+router.post('/', async (req, res) => {
+    const { userId, identityKey, registrationId, preKeys, signedPreKey } = req.body;
+
+    if (!userId || !identityKey || !registrationId || !preKeys || !signedPreKey) {
+        return res.status(400).json({ error: 'Missing required E2EE components' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Store Identity
+        await client.query(
+            `INSERT INTO identity_keys (user_id, identity_key, registration_id)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (user_id) 
+             DO UPDATE SET identity_key = $2, registration_id = $3, updated_at = CURRENT_TIMESTAMP`,
+            [userId, identityKey, registrationId]
+        );
+
+        // 2. Store Signed PreKey
+        await client.query(
+            `INSERT INTO signed_prekeys (user_id, key_id, public_key, signature)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (user_id, key_id) 
+             DO UPDATE SET public_key = $3, signature = $4, created_at = CURRENT_TIMESTAMP`,
+            [userId, signedPreKey.keyId, signedPreKey.publicKey, signedPreKey.signature]
+        );
+
+        // 3. Store One-time PreKeys
+        for (const prekey of preKeys) {
+            await client.query(
+                `INSERT INTO prekeys (user_id, key_id, public_key)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (user_id, key_id) DO NOTHING`,
+                [userId, prekey.keyId, prekey.publicKey]
+            );
+        }
+
+        await client.query('COMMIT');
+        console.log(`[E2EE-Backend] Registered keys for user: ${userId}`);
+        res.json({ success: true });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error during global key registration:', error);
+        res.status(500).json({ error: 'Failed to register encryption keys' });
+    } finally {
+        client.release();
+    }
+});
+
 // Store user's identity key
 router.post('/identity', async (req, res) => {
     try {
@@ -85,6 +137,30 @@ router.post('/signed-prekey', async (req, res) => {
     } catch (error) {
         console.error('Error storing signed prekey:', error);
         res.status(500).json({ error: 'Failed to store signed prekey' });
+    }
+});
+
+// Check if a user has encryption set up (non-destructive)
+router.get('/status/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const result = await pool.query(
+            `SELECT 
+                (SELECT COUNT(*) FROM identity_keys WHERE user_id = $1) > 0 as has_identity,
+                (SELECT COUNT(*) FROM signed_prekeys WHERE user_id = $1) > 0 as has_signed_prekey,
+                (SELECT COUNT(*) FROM prekeys WHERE user_id = $1 AND used = FALSE) as prekey_count`,
+            [userId]
+        );
+
+        const status = result.rows[0];
+        res.json({
+            isAvailable: status.has_identity && status.has_signed_prekey,
+            ...status
+        });
+    } catch (error) {
+        console.error('Error checking key status:', error);
+        res.status(500).json({ error: 'Failed to check key status' });
     }
 });
 

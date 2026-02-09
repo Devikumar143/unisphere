@@ -10,11 +10,12 @@ export const EARTH_COLORS = {
     sand: '#EAE0D5',      // Light papyrus (Cards/Surfaces in Light Mode)
     slate: '#22333B',     // Deep charcoal (Text/Main Dark Background)
     cream: '#F5EBE0',     // Soft ivory
+    universityBlue: '#4B9CD3', // Classic Campus Blue
 
     // Functional Palette
     bgDark: '#1A2321',    // Deep Forest/Midnight for Dark Mode
     bgCard: '#242F2D',    // Deep Moss for Cards in Dark Mode
-    bgLight: '#F5EBE0',   // Cream for Light Mode
+    bgLight: '#FFFFFF',   // Pure White for Light Mode
     bgCardLight: '#FFFFFF',
 
     // Accents

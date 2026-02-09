@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { X, Image as ImageIcon, Send, User } from 'lucide-react-native';
+import { X, Image as ImageIcon, Send, User, ChevronDown } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, SIZES, GLASS } from '../constants/theme';
+import { COLORS, SIZES, FONTS, EARTH_COLORS } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import { createPost, uploadImage } from '../services/api';
 import * as ImagePicker from 'expo-image-picker';
+
+const { width } = Dimensions.get('window');
 
 export default function CreatePostScreen({ user, onBack, isStory, communityContext }) {
     const { themeColors, isDark } = useTheme();
@@ -28,7 +30,6 @@ export default function CreatePostScreen({ user, onBack, isStory, communityConte
         let result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             allowsEditing: true,
-            aspect: isStory ? [9, 16] : [4, 5],
             quality: 0.8,
         });
 
@@ -81,38 +82,41 @@ export default function CreatePostScreen({ user, onBack, isStory, communityConte
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
-            {/* Background elements removed for Organic Earth style */}
-
             <SafeAreaView style={styles.safeArea}>
-                <View style={[styles.header, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-                    <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                        <X color={isDark ? themeColors.textMain : themeColors.textMainLight} size={24} />
+                {/* 1. Header */}
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        onPress={onBack}
+                        style={[styles.closeBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
+                    >
+                        <X color={isDark ? themeColors.textMain : themeColors.textMainLight} size={20} />
                     </TouchableOpacity>
-                    <Text style={[styles.headerTitle, {
-                        color: isDark ? themeColors.textMain : themeColors.textMainLight,
-                        flex: 1,
-                        marginLeft: 16,
-                        fontFamily: 'PlayfairDisplay-Bold'
-                    }]}>
+
+                    <Text style={[styles.headerTitle, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
                         {isStory ? 'New Story' : 'New Post'}
                     </Text>
+
                     <TouchableOpacity
-                        style={[styles.postBtn, { backgroundColor: themeColors.accentPrimary }, (!content.trim() && !imageUrl) && { backgroundColor: themeColors.bgCard }]}
+                        style={[
+                            styles.postBtn,
+                            { backgroundColor: themeColors.accentPrimary },
+                            (!content.trim() && !imageUrl) && { opacity: 0.6 }
+                        ]}
                         onPress={handlePost}
                         disabled={loading || (!content.trim() && !imageUrl)}
                     >
                         {loading ? (
                             <ActivityIndicator size="small" color="white" />
                         ) : (
-                            <>
-                                <Text style={styles.postBtnText}>Post</Text>
-                                <Send color={(!content.trim() && !imageUrl) ? themeColors.textDim : "white"} size={16} style={{ marginLeft: 6 }} />
-                            </>
+                            <Text style={styles.postBtnText}>Post</Text>
                         )}
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView contentContainerStyle={styles.content}>
+                {/* 2. Content Area */}
+                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+                    {/* User Info Row */}
                     <View style={styles.userInfo}>
                         {user?.avatar ? (
                             <Image
@@ -125,99 +129,115 @@ export default function CreatePostScreen({ user, onBack, isStory, communityConte
                             </View>
                         )}
                         <View style={{ flex: 1 }}>
-                            <Text style={[styles.userName, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>{user?.name || user?.full_name || 'User'}</Text>
-                            <View style={styles.destinationRow}>
-                                <Text style={[styles.userRole, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Posting to </Text>
-                                <TouchableOpacity
-                                    onPress={() => !communityContext && setSelectedCommunity(null)}
-                                    disabled={!!communityContext}
-                                >
-                                    <View style={[styles.destinationBadge, { backgroundColor: themeColors.accentPrimary + '15' }]}>
-                                        <Text style={[styles.destinationText, { color: themeColors.accentPrimary }]}>
-                                            {selectedCommunity ? selectedCommunity.communityName : 'Global Feed'}
-                                        </Text>
-                                        {(selectedCommunity && !communityContext) && <X size={12} color={themeColors.accentPrimary} style={{ marginLeft: 4 }} />}
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
+                            <Text style={[styles.userName, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>
+                                {user?.name || user?.full_name || 'User'}
+                            </Text>
+                            <TouchableOpacity
+                                style={[styles.destinationBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                                onPress={() => !communityContext && setSelectedCommunity(null)}
+                                disabled={!!communityContext}
+                            >
+                                <Text style={[styles.destinationText, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>
+                                    Posting to <Text style={{ color: themeColors.accentPrimary, fontWeight: '700' }}>
+                                        {selectedCommunity ? selectedCommunity.communityName : 'Global Feed'}
+                                    </Text>
+                                </Text>
+                                {(!communityContext && selectedCommunity) && (
+                                    <X size={12} color={themeColors.textDim} style={{ marginLeft: 6 }} />
+                                )}
+                                {(!communityContext && !selectedCommunity) && (
+                                    <ChevronDown size={12} color={themeColors.textDim} style={{ marginLeft: 6 }} />
+                                )}
+                            </TouchableOpacity>
                         </View>
                     </View>
 
+                    {/* Text Input */}
                     <TextInput
-                        style={[styles.input, { color: isDark ? themeColors.textMain : themeColors.textMainLight }, isStory && { fontSize: 22, textAlign: 'center' }]}
+                        style={[
+                            styles.input,
+                            {
+                                color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                fontFamily: FONTS.body || 'System'
+                            },
+                            isStory && { fontSize: 24, textAlign: 'center', fontFamily: FONTS.header }
+                        ]}
                         placeholder={isStory ? "Add a caption..." : "What's happening on campus?"}
-                        placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
+                        placeholderTextColor={isDark ? themeColors.textDim : themeColors.textDimLight}
                         multiline
                         autoFocus
                         value={content}
                         onChangeText={setContent}
-                        textAlignVertical={isStory ? "center" : "top"}
+                        textAlignVertical="top"
                     />
 
-                    {/* Image / Story Placeholder */}
-                    {isStory && !imageUrl && !uploading && (
-                        <TouchableOpacity style={[styles.storyPlaceholder, { borderColor: themeColors.border }]} onPress={pickImage}>
-                            <ImageIcon color={themeColors.textDim} size={48} />
-                            <Text style={{ color: themeColors.textDim, marginTop: 12 }}>Pick an image for your story</Text>
-                        </TouchableOpacity>
-                    )}
-
-                    {/* Image Preview / Uploading State */}
+                    {/* Media Preview */}
                     {uploading ? (
-                        <View style={[styles.imagePreviewContainer, { height: 200, justifyContent: 'center', alignItems: 'center', backgroundColor: themeColors.bgCard }]}>
+                        <View style={[styles.imagePreviewContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }]}>
                             <ActivityIndicator size="large" color={themeColors.accentPrimary} />
-                            <Text style={{ color: themeColors.textDim, marginTop: 10 }}>Uploading image...</Text>
+                            <Text style={{ color: themeColors.textDim, marginTop: 12 }}>Uploading...</Text>
                         </View>
                     ) : imageUrl ? (
                         <View style={styles.imagePreviewContainer}>
-                            <Image source={{ uri: imageUrl }} style={[styles.imagePreview, { backgroundColor: themeColors.bgCard }]} />
-                            <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImageUrl('')}>
-                                <View style={[styles.removeIconBlur, { backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)' }]}>
-                                    <X color={isDark ? '#FFF' : '#333'} size={16} />
-                                </View>
+                            <Image source={{ uri: imageUrl }} style={styles.imagePreview} />
+                            <TouchableOpacity
+                                style={styles.removeImageBtn}
+                                onPress={() => setImageUrl('')}
+                            >
+                                <BlurView intensity={20} tint="dark" style={styles.removeIconBlur}>
+                                    <X color="#FFF" size={16} />
+                                </BlurView>
                             </TouchableOpacity>
                         </View>
                     ) : null}
 
-                    {/* Image URL Input (MVP) */}
+                    {/* URL Input (if enabled) */}
                     {showImageUrlInput && (
-                        <View style={[styles.urlInputContainer, { backgroundColor: themeColors.bgCard }]}>
+                        <View style={[styles.urlInputContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
                             <TextInput
-                                style={[styles.urlInput, { color: themeColors.textMain }]}
+                                style={[styles.urlInput, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}
                                 placeholder="Paste image URL here..."
                                 placeholderTextColor={themeColors.textDim}
                                 value={imageUrl}
                                 onChangeText={setImageUrl}
                                 autoCapitalize="none"
                             />
+                            <TouchableOpacity onPress={() => setShowImageUrlInput(false)}>
+                                <X size={18} color={themeColors.textDim} />
+                            </TouchableOpacity>
                         </View>
                     )}
                 </ScrollView>
 
+                {/* 3. Bottom Toolbar */}
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
                     <View style={[styles.toolbar, {
                         borderTopColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
                         backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight
                     }]}>
                         <TouchableOpacity
-                            style={[styles.toolbarBtn, { backgroundColor: themeColors.accentPrimary + '15' }]}
+                            style={[styles.toolbarItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
                             onPress={pickImage}
                             disabled={uploading}
                         >
-                            <ImageIcon color={themeColors.accentPrimary} size={24} />
-                            <Text style={[styles.toolbarText, { color: themeColors.accentPrimary }]}>Pick Image</Text>
+                            <ImageIcon color={themeColors.accentPrimary} size={22} />
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.toolbarBtn, { marginLeft: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
+                            style={[styles.toolbarItem, { marginLeft: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
                             onPress={() => setShowImageUrlInput(prev => !prev)}
                         >
                             <Text style={[styles.toolbarText, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>URL</Text>
                         </TouchableOpacity>
-                        {/* Future: Add Video, Polls, etc. */}
+
+                        <View style={{ flex: 1 }} />
+
+                        {/* Character count or other indicators could go here */}
+                        <Text style={{ color: themeColors.textDim, fontSize: 12 }}>
+                            {content.length}/500
+                        </Text>
                     </View>
                 </KeyboardAvoidingView>
-
             </SafeAreaView>
         </View>
     );
@@ -226,7 +246,6 @@ export default function CreatePostScreen({ user, onBack, isStory, communityConte
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.bgDark,
     },
     safeArea: {
         flex: 1,
@@ -236,32 +255,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: SIZES.padding,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.05)',
+        paddingVertical: 16,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 16,
+        fontFamily: FONTS.header,
         fontWeight: '700',
-        color: COLORS.textMain,
     },
-    backBtn: {
-        width: 40,
-        height: 40,
+    closeBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 20,
     },
     postBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.accentPrimary,
-        paddingHorizontal: 16,
+        paddingHorizontal: 20,
         paddingVertical: 8,
         borderRadius: 20,
-    },
-    postBtnDisabled: {
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        minWidth: 70,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     postBtnText: {
         color: 'white',
@@ -270,116 +284,99 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: SIZES.padding,
-        flexGrow: 1,
+        paddingTop: 0,
     },
     userInfo: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 20,
+        marginVertical: 20,
     },
     avatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        marginRight: 12,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        marginRight: 14,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
     },
     userName: {
-        color: COLORS.textMain,
-        fontWeight: '700',
         fontSize: 16,
-    },
-    userRole: {
-        color: COLORS.textDim,
-        fontSize: 13,
-    },
-    destinationRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 2,
+        fontWeight: '700',
+        marginBottom: 4,
     },
     destinationBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
+        paddingHorizontal: 8,
         paddingVertical: 4,
-        borderRadius: 12,
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        overflow: 'hidden',
+        borderRadius: 8,
+        alignSelf: 'flex-start',
     },
     destinationText: {
-        fontSize: 12,
-        fontWeight: '700',
+        fontSize: 13,
     },
     input: {
-        color: COLORS.textMain,
         fontSize: 18,
         minHeight: 120,
+        lineHeight: 26,
+        textAlignVertical: 'top',
     },
     imagePreviewContainer: {
         marginTop: 20,
+        width: '100%',
+        height: 250,
         borderRadius: SIZES.radiusMedium,
         overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
         position: 'relative',
     },
     imagePreview: {
         width: '100%',
-        height: 200,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        height: '100%',
         resizeMode: 'cover',
     },
     removeImageBtn: {
         position: 'absolute',
-        top: 10,
-        right: 10,
+        top: 12,
+        right: 12,
     },
     removeIconBlur: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',
     },
     urlInputContainer: {
-        marginTop: 10,
-        padding: 10,
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 10,
+        marginTop: 15,
+        padding: 12,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
     },
     urlInput: {
-        color: COLORS.textMain,
+        flex: 1,
         fontSize: 14,
+        marginRight: 10,
     },
     toolbar: {
         padding: SIZES.padding,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.05)',
+        paddingBottom: Platform.OS === 'ios' ? 0 : SIZES.padding,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.2)', // Slight bg to separate
     },
-    toolbarBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 8,
-        borderRadius: 8,
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    },
-    toolbarText: {
-        color: COLORS.accentPrimary,
-        fontWeight: '600',
-        marginLeft: 8,
-    },
-    storyPlaceholder: {
-        width: '100%',
-        height: 300,
-        borderRadius: 20,
-        borderWidth: 2,
-        borderStyle: 'dashed',
+    toolbarItem: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 10,
+    },
+    toolbarText: {
+        fontWeight: '600',
+        fontSize: 13,
     }
 });

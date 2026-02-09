@@ -29,12 +29,15 @@ export async function registerForPushNotificationsAsync() {
 
     if (Platform.OS === 'android') {
         try {
-            await Notifications.setNotificationChannelAsync('default', {
-                name: 'default',
-                importance: Notifications.AndroidImportance.MAX,
-                vibrationPattern: [0, 250, 250, 250],
-                lightColor: '#FF231F7C',
-            });
+            const channel = await Notifications.getNotificationChannelAsync('default');
+            if (!channel) {
+                await Notifications.setNotificationChannelAsync('default', {
+                    name: 'default',
+                    importance: Notifications.AndroidImportance.MAX,
+                    vibrationPattern: [0, 250, 250, 250],
+                    lightColor: '#FF231F7C',
+                });
+            }
         } catch (e) {
             console.warn('Failed to set notification channel:', e);
         }

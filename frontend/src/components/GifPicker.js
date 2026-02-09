@@ -2,10 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, FlatList, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Modal, Platform } from 'react-native';
 import { Search, X } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
+import { fetchGifsFromProxy } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
-import { COLORS } from '../constants/theme';
-
-const GIPHY_API_KEY = 'YOUR_GIPHY_API_KEY_HERE'; // TODO: Move to env
 
 const GifPicker = ({ visible, onClose, onSelect }) => {
     const { isDark, themeColors } = useTheme();
@@ -17,20 +15,15 @@ const GifPicker = ({ visible, onClose, onSelect }) => {
     // Fetch trending GIFs on mount
     useEffect(() => {
         if (visible && !searchQuery) {
-            fetchGifs();
+            fetchGifs('');
         }
     }, [visible, searchQuery]);
 
     const fetchGifs = async (query = '') => {
         setLoading(true);
         try {
-            const endpoint = query
-                ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${query}&limit=20&rating=g`
-                : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=g`;
-
-            const response = await fetch(endpoint);
-            const data = await response.json();
-            setGifs(data.data);
+            const data = await fetchGifsFromProxy(query);
+            setGifs(data || []);
         } catch (error) {
             console.error('Error fetching GIFs:', error);
         } finally {

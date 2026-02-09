@@ -32,7 +32,15 @@ export const ThemeProvider = ({ children }) => {
         }
     };
 
-    const themeColors = EARTH_COLORS; // Now using unified Organic Earth palette
+    const themeColors = {
+        ...EARTH_COLORS,
+        // Override standard colors based on mode
+        bgDark: isDark ? EARTH_COLORS.bgDark : EARTH_COLORS.bgLight,
+        bgCard: isDark ? EARTH_COLORS.bgCard : EARTH_COLORS.bgCardLight,
+        textMain: isDark ? EARTH_COLORS.textMain : EARTH_COLORS.textMainLight,
+        textMuted: isDark ? EARTH_COLORS.textMuted : EARTH_COLORS.textMutedLight,
+        textDim: isDark ? EARTH_COLORS.textDim : EARTH_COLORS.textDimLight,
+    };
 
     return (
         <ThemeContext.Provider value={{ isDark, toggleTheme, themeColors }}>

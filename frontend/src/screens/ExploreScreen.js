@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TextInput, FlatList, ActivityIndicator, Touchab
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { Search, X, TrendingUp, Sparkles, Filter } from 'lucide-react-native';
+import { Search, X, TrendingUp, Sparkles, Filter, Map } from 'lucide-react-native';
 import { COLORS, SIZES, GLASS } from '../constants/theme';
 import { searchUsers, fetchCommunities } from '../services/api';
 import UserListItem from '../components/UserListItem';
@@ -13,7 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommunity }) {
+export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommunity, onOpenMap }) {
     const { isDark, themeColors } = useTheme();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
@@ -159,32 +159,37 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
                 >
                     {/* Header Section */}
                     <View style={styles.header}>
-                        <View style={styles.headerTop}>
-                            <View>
-                                <Text style={[styles.headerTitle, {
-                                    color: isDark ? themeColors.textMain : themeColors.textMainLight,
-                                    fontFamily: 'PlayfairDisplay-Bold'
-                                }]}>Discover</Text>
-                                <Text style={[styles.headerSubtitle, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Explore the UniSphere</Text>
+                        <BlurView intensity={20} tint={isDark ? "dark" : "light"} style={styles.headerPill}>
+                            <View style={styles.headerContent}>
+                                <View>
+                                    <Text style={[styles.headerTitle, {
+                                        color: isDark ? themeColors.textMain : themeColors.textMainLight,
+                                        fontFamily: 'PlayfairDisplay-Bold'
+                                    }]}>Discover</Text>
+                                    <Text style={[styles.headerSubtitle, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>Explore UniSphere</Text>
+                                </View>
+                                <View style={styles.headerActions}>
+                                    <TouchableOpacity
+                                        onPress={onOpenMap}
+                                        style={[styles.miniIconBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                                    >
+                                        <Map color={themeColors.accentPrimary} size={18} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.miniIconBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                                        <Sparkles color={themeColors.accentPrimary} size={18} />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]}>
-                                <Sparkles color={themeColors.accentPrimary} size={20} />
-                            </TouchableOpacity>
-                        </View>
+                        </BlurView>
                     </View>
 
                     {/* Search Bar (Sticky) */}
                     <View style={styles.searchWrapper}>
-                        <View style={[styles.searchBar, {
-                            backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight,
-                            borderColor: themeColors.accentPrimary + '15',
-                            borderWidth: 1,
-                            borderRadius: 24
-                        }]}>
+                        <BlurView intensity={30} tint={isDark ? "dark" : "light"} style={styles.searchPill}>
                             <Search color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={20} />
                             <TextInput
                                 style={[styles.input, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}
-                                placeholder="Search people, tags, clubs..."
+                                placeholder="Search UniSphere..."
                                 placeholderTextColor={isDark ? themeColors.textMuted : themeColors.textMutedLight}
                                 value={query}
                                 onChangeText={setQuery}
@@ -199,7 +204,7 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
                                     <Filter color={isDark ? themeColors.textMuted : themeColors.textMutedLight} size={18} />
                                 </TouchableOpacity>
                             )}
-                        </View>
+                        </BlurView>
 
                         {/* Filter Tabs */}
                         <ScrollView
@@ -212,18 +217,23 @@ export default function ExploreScreen({ onOpenChat, onViewProfile, onOpenCommuni
                                 <TouchableOpacity
                                     key={filter}
                                     onPress={() => setSelectedFilter(filter)}
-                                    style={[
-                                        styles.filterPill,
-                                        { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight },
-                                        selectedFilter === filter && { backgroundColor: themeColors.accentPrimary }
-                                    ]}
+                                    activeOpacity={0.7}
                                 >
-                                    <Text style={[
-                                        styles.filterText,
-                                        { color: selectedFilter === filter ? '#FFF' : (isDark ? themeColors.textMuted : themeColors.textMutedLight) }
-                                    ]}>
-                                        {filter}
-                                    </Text>
+                                    <BlurView
+                                        intensity={selectedFilter === filter ? 60 : 20}
+                                        tint={isDark ? "dark" : "light"}
+                                        style={[
+                                            styles.filterPill,
+                                            selectedFilter === filter && { backgroundColor: themeColors.accentPrimary + '40' }
+                                        ]}
+                                    >
+                                        <Text style={[
+                                            styles.filterText,
+                                            { color: selectedFilter === filter ? themeColors.accentPrimary : (isDark ? themeColors.textMuted : themeColors.textMutedLight) }
+                                        ]}>
+                                            {filter}
+                                        </Text>
+                                    </BlurView>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -368,30 +378,42 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
     header: {
-        paddingHorizontal: 24,
-        paddingTop: 20,
-        paddingBottom: 10,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 8,
     },
-    headerTop: {
+    headerPill: {
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        padding: 12,
+        paddingHorizontal: 16,
+    },
+    headerContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
+    headerActions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
     headerTitle: {
-        fontSize: 34,
+        fontSize: 22,
         fontWeight: '900',
-        letterSpacing: -1,
+        letterSpacing: -0.5,
     },
     headerSubtitle: {
-        fontSize: 15,
+        fontSize: 12,
         fontWeight: '600',
-        marginTop: 2,
         opacity: 0.6,
+        marginTop: -2,
     },
-    iconBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+    miniIconBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -400,22 +422,20 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         zIndex: 100,
     },
-    searchBlur: {
-        borderRadius: 24,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-    searchBar: {
+    searchPill: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
     },
     input: {
         flex: 1,
         marginLeft: 12,
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
     },
     resultsContainer: {
@@ -493,19 +513,19 @@ const styles = StyleSheet.create({
     },
     filterScroll: {
         paddingHorizontal: 0,
-        gap: 8,
+        gap: 10,
     },
     filterPill: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 18,
         paddingVertical: 8,
         borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.06)',
+        overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     filterText: {
-        fontSize: 14,
-        fontWeight: '700',
+        fontSize: 13,
+        fontWeight: '800',
     },
     resultSection: {
         marginBottom: 24,

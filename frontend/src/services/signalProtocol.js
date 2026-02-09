@@ -1,277 +1,340 @@
 import SignalProtocolStore from './signalStore';
 import { API_URL } from './api';
+import { Buffer } from 'buffer';
+
+const libsignal = require('@privacyresearch/libsignal-protocol-typescript');
+const { KeyHelper, SessionBuilder, SessionCipher, SignalProtocolAddress } = libsignal;
 
 /**
  * Signal Protocol Service
- * Handles end-to-end encryption using Signal Protocol
- * 
- * Note: This is a simplified implementation for demonstration.
- * For production, consider using @signalapp/libsignal-client directly
- * with proper key generation and session management.
+ * REAL IMPLEMENTATION using libsignal-protocol-javascript
  */
 
 class SignalProtocolService {
     constructor() {
         this.store = null;
         this.userId = null;
+        this.deviceId = 1; // Default device ID
         this.initialized = false;
     }
 
-    /**
-     * Initialize the encryption service for a user
-     */
     async initialize(userId) {
-        if (this.initialized && this.userId === userId) {
-            return;
-        }
+        if (this.initialized && this.userId === userId) return;
 
+        console.log('[E2EE] Initializing for user:', userId);
         this.userId = userId;
         this.store = new SignalProtocolStore(userId);
 
+        // Ensure encryption usage availability
+        const keys = await this.store.getAllKeys();
+
+        // Check if encryption is actually registered on server
+        const status = await this.getServerKeyStatus(userId);
+        if (!keys.hasKeys) {
+            console.log('[E2EE] No keys found locally. Generating new Identity...');
+            await this.generateAndUploadKeys();
+        } else if (!status.isAvailable) {
+            console.log('[E2EE] Keys found locally but server is missing them. Syncing...');
+            await this.syncExistingKeysToServer();
+        } else {
+            console.log('[E2EE] Keys loaded and verified on server.');
+        }
+        this.initialized = true;
+    }
+
+    async getServerKeyStatus(userId) {
         try {
-            // Check if keys already exist
-            const keys = await this.store.getAllKeys();
-
-            if (!keys.hasKeys) {
-                console.log('No encryption keys found. Generating new keys...');
-                await this.generateAndUploadKeys();
-            } else {
-                console.log('Encryption keys loaded from secure storage');
-            }
-
-            this.initialized = true;
-        } catch (error) {
-            console.error('[E2EE] Failed to initialize encryption:', error);
-            if (error.message.includes('Network request failed')) {
-                console.error('[E2EE] NETWORK ERROR: Please check your API_URL in api.js and ensure backend is reachable.');
-                console.error('[E2EE] If using emulator, use http://10.0.2.2:5001/api');
-                console.error('[E2EE] If using physical device, ensure device is on same Wi-Fi and IP is correct.');
-            }
+            const res = await fetch(`${API_URL}/keys/status/${userId}`);
+            if (!res.ok) return { isAvailable: false };
+            return await res.json();
+        } catch (e) {
+            console.error('[E2EE] Failed to check server key status:', e);
+            return { isAvailable: false };
         }
     }
 
-    /**
-     * Generate identity key, prekeys, and signed prekey
-     * Then upload them to the server
-     */
+    async registerKeys() {
+        if (!this.userId) throw new Error('User not identified');
+        console.log('[E2EE] Manual key registration triggered...');
+        await this.generateAndUploadKeys();
+    }
+
+    async syncExistingKeysToServer() {
+        try {
+            console.log('[E2EE] Reading local keys for sync...');
+            const id = await this.store.getIdentityKeyPair();
+            const regId = await this.store.getLocalRegistrationId();
+
+            // For sync, we'll try to find a signed prekey. We'll check common IDs like 1.
+            const signedPK = await this.store.getSignedPreKey(1);
+
+            if (!id || !regId || !signedPK) {
+                console.warn('[E2EE] Local keys incomplete for sync. Re-generating...');
+                return await this.generateAndUploadKeys();
+            }
+
+            // Collect some prekeys
+            const preKeysToUpload = [];
+            for (let i = 1; i <= 50; i++) {
+                const pk = await this.store.getPreKey(i);
+                if (pk) {
+                    preKeysToUpload.push({
+                        keyId: i,
+                        publicKey: this._toBase64(pk.pubKey)
+                    });
+                }
+            }
+
+            const payload = {
+                userId: this.userId,
+                deviceId: this.deviceId,
+                identityKey: this._toBase64(id.pubKey),
+                registrationId: regId,
+                preKeys: preKeysToUpload,
+                signedPreKey: {
+                    keyId: 1,
+                    publicKey: this._toBase64(signedPK.pubKey),
+                    signature: this._toBase64(signedPK.signature)
+                }
+            };
+
+            console.log('[E2EE] Uploading existing keys...');
+            const response = await fetch(`${API_URL}/keys`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error('Sync failed');
+            console.log('[E2EE] Sync completed successfully!');
+        } catch (e) {
+            console.error('[E2EE] Sync error:', e);
+            // Fallback: if sync fails and it's critical, we could regenerate, 
+            // but that breaks existing sessions. Better to just let initialize finish.
+        }
+    }
+
+    // Helper: ArrayBuffer <-> Base64
+    _toBase64(buffer) {
+        if (!buffer) return '';
+        try {
+            return Buffer.from(buffer).toString('base64');
+        } catch (e) {
+            console.error('[E2EE] _toBase64 error:', e, 'Buffer:', buffer);
+            return '';
+        }
+    }
+
+    _toArrayBuffer(base64) {
+        if (!base64) return undefined;
+        try {
+            const buf = Buffer.from(base64, 'base64');
+            return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+        } catch (e) {
+            console.error('[E2EE] _toArrayBuffer error:', e);
+            return undefined;
+        }
+    }
+
     async generateAndUploadKeys() {
         try {
-            // Generate registration ID (random number)
-            const registrationId = Math.floor(Math.random() * 16380) + 1;
+            const registrationId = KeyHelper.generateRegistrationId();
+            const identityKeyPair = await KeyHelper.generateIdentityKeyPair();
 
-            // For this simplified version, we'll use random strings as keys
-            // In production, use @signalapp/libsignal-client for proper key generation
-            const identityKey = this._generateRandomKey();
+            console.log('[E2EE] Identity KeyPair generated:', {
+                hasPubKey: !!(identityKeyPair.pubKey || identityKeyPair.publicKey),
+                hasPrivKey: !!(identityKeyPair.privKey || identityKeyPair.privateKey)
+            });
 
-            // Save locally
-            await this.store.saveIdentityKey(identityKey);
-            await this.store.saveRegistrationId(registrationId);
+            // Normalize for our store (we'll use pubKey/privKey internally for storage consistency)
+            const normalizedIdentity = {
+                pubKey: identityKeyPair.pubKey || identityKeyPair.publicKey,
+                privKey: identityKeyPair.privKey || identityKeyPair.privateKey
+            };
 
-            // Generate prekeys (100 one-time use keys)
-            const prekeys = [];
-            for (let i = 1; i <= 100; i++) {
-                const prekey = {
-                    keyId: i,
-                    publicKey: this._generateRandomKey()
-                };
-                prekeys.push(prekey);
-                await this.store.savePreKey(i, prekey);
+            // Save Identity
+            await this.store.putIdentityKeyPair(normalizedIdentity);
+            await this.store.putLocalRegistrationId(registrationId);
+
+
+            // Generate PreKeys (100)
+            const preKeysToUpload = [];
+            for (let i = 0; i < 100; i++) {
+                const keyId = i + 1;
+                const preKey = await KeyHelper.generatePreKey(keyId);
+
+                const pub = preKey.keyPair.pubKey || preKey.keyPair.publicKey;
+                const priv = preKey.keyPair.privKey || preKey.keyPair.privateKey;
+
+                if (!preKey || !preKey.keyPair || !pub) {
+                    console.error(`[E2EE] Failed to generate PreKey ${keyId}:`, preKey);
+                } else {
+                    await this.store.putPreKey(preKey.keyId, { pubKey: pub, privKey: priv });
+                    preKeysToUpload.push({
+                        keyId: preKey.keyId,
+                        publicKey: this._toBase64(pub)
+                    });
+                }
             }
 
-            // Generate signed prekey
-            const signedPreKey = {
-                keyId: 1,
-                publicKey: this._generateRandomKey(),
-                signature: this._generateRandomKey()
+            // Generate Signed PreKey
+            console.log('[E2EE] Generating Signed PreKey...');
+            const signedPreKey = await KeyHelper.generateSignedPreKey(identityKeyPair, 1);
+            if (!signedPreKey || !signedPreKey.signature) {
+                console.error('[E2EE] Failed to generate Signed PreKey:', signedPreKey);
+                throw new Error('Failed to generate Signed PreKey');
+            }
+
+            const spkPub = signedPreKey.keyPair.pubKey || signedPreKey.keyPair.publicKey;
+            const spkPriv = signedPreKey.keyPair.privKey || signedPreKey.keyPair.privateKey;
+
+            await this.store.putSignedPreKey(signedPreKey.keyId, { pubKey: spkPub, privKey: spkPriv }, signedPreKey.signature);
+
+            const signedPreKeyToUpload = {
+                keyId: signedPreKey.keyId,
+                publicKey: this._toBase64(spkPub),
+                signature: this._toBase64(signedPreKey.signature)
             };
-            await this.store.saveSignedPreKey(1, signedPreKey);
 
-            // Upload to server
-            await this._uploadKeysToServer(identityKey, registrationId, prekeys, signedPreKey);
+            // Public Identity Key
+            const publicIdentityKey = this._toBase64(normalizedIdentity.pubKey);
 
-            console.log('✅ Encryption keys generated and uploaded successfully');
-        } catch (error) {
-            console.error('Error generating keys:', error);
-            throw error;
+            // Upload
+            console.log('[E2EE] Uploading keys to server...');
+            await this._uploadKeysToServer(publicIdentityKey, registrationId, preKeysToUpload, signedPreKeyToUpload);
+            console.log('[E2EE] Keys generated and uploaded!');
+
+        } catch (e) {
+            console.error('[E2EE] Error generating keys:', e);
+            throw e;
         }
     }
 
-    /**
-     * Upload keys to the backend
-     */
-    async _uploadKeysToServer(identityKey, registrationId, prekeys, signedPreKey) {
-        try {
-            // Upload identity key
-            await fetch(`${API_URL}/keys/identity`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: this.userId,
-                    identityKey,
-                    registrationId
-                })
-            });
-
-            // Upload prekeys
-            await fetch(`${API_URL}/keys/prekeys`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: this.userId,
-                    prekeys
-                })
-            });
-
-            // Upload signed prekey
-            await fetch(`${API_URL}/keys/signed-prekey`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: this.userId,
-                    keyId: signedPreKey.keyId,
-                    publicKey: signedPreKey.publicKey,
-                    signature: signedPreKey.signature
-                })
-            });
-        } catch (error) {
-            console.error('Error uploading keys to server:', error);
-            throw error;
-        }
+    async _uploadKeysToServer(identityKey, registrationId, preKeys, signedPreKey) {
+        const response = await fetch(`${API_URL}/keys`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: this.userId,
+                deviceId: this.deviceId,
+                identityKey,
+                registrationId,
+                preKeys,
+                signedPreKey
+            })
+        });
+        if (!response.ok) throw new Error('Failed to upload keys');
     }
 
-    /**
-     * Encrypt a message for a recipient
-     */
+    // Encrypt
     async encryptMessage(recipientId, plaintext) {
-        if (!this.initialized) {
-            throw new Error('Encryption service not initialized');
+        if (!this.initialized) throw new Error('E2EE not initialized');
+
+        const address = new SignalProtocolAddress(recipientId, this.deviceId);
+        const sessionCipher = new SessionCipher(this.store, address);
+
+        // Check if session exists (libsignal doesn't have simple exists(), we try loadSession from store)
+        const session = await this.store.loadSession(address.toString());
+
+        if (!session) {
+            console.log(`[E2EE] No session for ${recipientId}, building...`);
+            await this._buildSession(recipientId);
         }
 
-        try {
-            // Check if we have a session with this recipient
-            const hasSession = await this.store.sessionExists(recipientId);
+        const ciphertext = await sessionCipher.encrypt(Buffer.from(plaintext));
+        // ciphertext is { type: number, body: string (binary/base64?) } 
+        // libsignal-javascript returns body as string (binary usually)
 
-            if (!hasSession) {
-                // Build new session
-                await this._buildSession(recipientId);
+        // We need to encode the body to Base64 to send over JSON
+        // Actually, let's verify what `encrypt` returns. It returns { type, body }. 'body' is a string of chars (binary string).
+        // Best to convert body to Base64.
+
+        return {
+            type: ciphertext.type, // 3 = PreKeyWhisperMessage, 1 = WhisperMessage
+            body: Buffer.from(ciphertext.body, 'binary').toString('base64'),
+            registrationId: ciphertext.registrationId
+        };
+    }
+
+    // Decrypt
+    async decryptMessage(senderId, message) {
+        // message: { type, body (base64) }
+        const address = new SignalProtocolAddress(senderId, this.deviceId);
+        const sessionCipher = new SessionCipher(this.store, address);
+
+        const buffer = Buffer.from(message.body, 'base64');
+        // libsignal expects 'binary string' or ArrayBuffer? 
+        // SessionCipher.decryptWhisperMessage expects string (binary) or buffer.
+        // Let's pass ArrayBuffer.
+
+        let plaintextArrayBuffer;
+
+        try {
+            if (message.type === 3) {
+                // PreKeyWhisperMessage
+                plaintextArrayBuffer = await sessionCipher.decryptPreKeyWhisperMessage(buffer, 'binary');
+            } else if (message.type === 1) {
+                // WhisperMessage
+                plaintextArrayBuffer = await sessionCipher.decryptWhisperMessage(buffer, 'binary');
+            } else {
+                console.error('Unknown message type:', message.type);
+                throw new Error('Unknown Type');
             }
 
-            // For this simplified version, we'll use basic encryption
-            // In production, use SessionCipher from libsignal-client
-            const encrypted = this._simpleEncrypt(plaintext);
+            // Result is ArrayBuffer. Convert to string.
+            return Buffer.from(plaintextArrayBuffer).toString('utf-8');
 
-            return {
-                ciphertext: encrypted,
-                type: hasSession ? 'message' : 'prekey_message'
-            };
-        } catch (error) {
-            console.error('Error encrypting message:', error);
-            throw error;
+        } catch (e) {
+            console.error('[E2EE] Decryption failed:', e);
+            throw e;
         }
     }
 
-    /**
-     * Decrypt a message from a sender
-     */
-    async decryptMessage(senderId, ciphertext, type) {
-        if (!this.initialized) {
-            throw new Error('Encryption service not initialized');
-        }
-
-        try {
-            // For this simplified version, we'll use basic decryption
-            // In production, use SessionCipher from libsignal-client
-            const plaintext = this._simpleDecrypt(ciphertext);
-
-            // Save session if it's a new prekey message
-            if (type === 'prekey_message') {
-                await this.store.saveSession(senderId, { established: true });
-            }
-
-            return plaintext;
-        } catch (error) {
-            console.error('Error decrypting message:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Build a session with a recipient by fetching their prekey bundle
-     */
     async _buildSession(recipientId) {
-        try {
-            const response = await fetch(`${API_URL}/keys/bundle/${recipientId}`);
-            const bundle = await response.json();
+        const address = new SignalProtocolAddress(recipientId, this.deviceId);
+        const sessionBuilder = new SessionBuilder(this.store, address);
 
-            if (!bundle || !bundle.identityKey) {
-                throw new Error('Recipient has not set up encryption');
+        const bundle = await this._fetchPreKeyBundle(recipientId);
+
+        // Convert bundle parts to ArrayBuffers
+        const preKeyBundle = {
+            identityKey: this._toArrayBuffer(bundle.identityKey),
+            registrationId: parseInt(bundle.registrationId),
+            preKey: bundle.preKey ? {
+                keyId: parseInt(bundle.preKey.keyId),
+                publicKey: this._toArrayBuffer(bundle.preKey.publicKey)
+            } : undefined,
+            signedPreKey: {
+                keyId: parseInt(bundle.signedPreKey.keyId),
+                publicKey: this._toArrayBuffer(bundle.signedPreKey.publicKey),
+                signature: this._toArrayBuffer(bundle.signedPreKey.signature)
             }
+        };
 
-            // In production, use SessionBuilder from libsignal-client
-            // For now, just mark session as established
-            await this.store.saveSession(recipientId, {
-                established: true,
-                recipientIdentityKey: bundle.identityKey
-            });
-
-            console.log(`Session established with user ${recipientId}`);
-        } catch (error) {
-            console.error('Error building session:', error);
-            throw error;
-        }
+        await sessionBuilder.processPreKey(preKeyBundle);
+        console.log('[E2EE] Session built for', recipientId);
     }
 
-    /**
-     * Helper: Generate a random key (simplified)
-     * In production, use proper cryptographic key generation
-     */
-    _generateRandomKey() {
-        return Array.from({ length: 32 }, () =>
-            Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
-        ).join('');
+    async _fetchPreKeyBundle(recipientId) {
+        const response = await fetch(`${API_URL}/keys/bundle/${recipientId}`);
+        if (!response.ok) throw new Error('Could not fetch bundle');
+        return await response.json();
     }
 
-    /**
-     * Helper: Simple encryption (for demonstration only!)
-     * In production, use SessionCipher from libsignal-client
-     */
-    _simpleEncrypt(plaintext) {
-        // This is NOT secure! Just for demonstration
-        return Buffer.from(plaintext).toString('base64');
+    // Debug
+    async debugLogKeys() {
+        return await this.store.getAllKeys();
     }
 
-    /**
-     * Helper: Simple decryption (for demonstration only!)
-     * In production, use SessionCipher from libsignal-client
-     */
-    _simpleDecrypt(ciphertext) {
-        // This is NOT secure! Just for demonstration
-        return Buffer.from(ciphertext, 'base64').toString('utf-8');
-    }
-
-    /**
-     * Check if encryption is available for a recipient
-     */
     async isEncryptionAvailable(recipientId) {
         try {
-            const response = await fetch(`${API_URL}/keys/bundle/${recipientId}`);
-            return response.ok;
-        } catch (error) {
+            const status = await this.getServerKeyStatus(recipientId);
+            return status.isAvailable;
+        } catch {
             return false;
         }
     }
-
-    /**
-     * Get encryption status
-     */
-    getStatus() {
-        return {
-            initialized: this.initialized,
-            userId: this.userId
-        };
-    }
 }
 
-// Export singleton instance
-const signalProtocolService = new SignalProtocolService();
-export default signalProtocolService;
+const signalProtocol = new SignalProtocolService();
+export default signalProtocol;

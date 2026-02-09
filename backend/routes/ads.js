@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { query } = require('../db');
 
-// Get all active ads/posters
+const { authenticateToken } = require('../middleware/auth');
+
+// Get all active ads/posters (Public)
 router.get('/', async (req, res) => {
     try {
         const sql = `
@@ -18,8 +20,8 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Create a new ad/poster
-router.post('/', async (req, res) => {
+// Create a new ad/poster (Admin Only)
+router.post('/', authenticateToken, async (req, res) => {
     const { title, imageUrl, redirectUrl, category } = req.body;
 
     if (!title || !imageUrl) {
@@ -27,6 +29,12 @@ router.post('/', async (req, res) => {
     }
 
     try {
+        // Verify Admin Role
+        const userRes = await query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+        if (userRes.rows.length === 0 || userRes.rows[0].role !== 'Admin') {
+            return res.status(403).json({ error: 'Access denied. Admins only.' });
+        }
+
         const sql = `
             INSERT INTO ads (title, image_url, redirect_url, category)
             VALUES ($1, $2, $3, $4)
@@ -40,10 +48,16 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Delete an ad/poster
-router.delete('/:id', async (req, res) => {
+// Delete an ad/poster (Admin Only)
+router.delete('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
+        // Verify Admin Role
+        const userRes = await query('SELECT role FROM users WHERE id = $1', [req.user.id]);
+        if (userRes.rows.length === 0 || userRes.rows[0].role !== 'Admin') {
+            return res.status(403).json({ error: 'Access denied. Admins only.' });
+        }
+
         await query('DELETE FROM ads WHERE id = $1', [id]);
         res.json({ success: true, message: 'Ad deleted successfully' });
     } catch (err) {

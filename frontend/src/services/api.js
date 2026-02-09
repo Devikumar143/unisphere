@@ -1,16 +1,21 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 // --- Production Configuration ---
 const PRODUCTION_URL = 'https://unisphere-api.onrender.com/api';
-const DEVELOPMENT_URL = Platform.OS === 'web'
-    ? 'http://localhost:5001/api'
-    : 'http://10.218.116.250:5001/api';
 
-// --- Dynamic API Switch ---
-// __DEV__ is true when running npx expo start, false when running in a production build
-const API_URL = __DEV__ ? DEVELOPMENT_URL : PRODUCTION_URL;
+const getDevUrl = () => {
+    if (Platform.OS === 'web') return 'http://localhost:5001/api';
 
-console.log(`[Networking] ${__DEV__ ? 'Development' : 'Production'} API URL:`, API_URL);
+    // Dynamic IP Detection for Expo Go
+    const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest2?.extra?.expoGo?.debuggerHost;
+    const localhost = debuggerHost?.split(':')[0] || '10.188.11.250'; // Fallback to last known good IP
+    return `http://${localhost}:5001/api`;
+};
+
+const DEVELOPMENT_URL = getDevUrl();
+
+export const API_URL = __DEV__ ? DEVELOPMENT_URL : PRODUCTION_URL;
 
 export const remoteLog = async (level, message, details = {}) => {
     try {
@@ -27,7 +32,6 @@ export const remoteLog = async (level, message, details = {}) => {
 
 export const loginUser = async (email, password) => {
     try {
-        console.log(`Attempting login to: ${API_URL}/auth/login`);
         const response = await fetch(`${API_URL}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -44,17 +48,19 @@ export const loginUser = async (email, password) => {
 
 export const registerUser = async (userData) => {
     try {
-        console.log(`Attempting register to: ${API_URL}/auth/register`);
         const response = await fetch(`${API_URL}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData),
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Registration failed');
+        if (!response.ok) {
+            console.error('[API] Registration Failed:', data.error || 'Unknown Error', { status: response.status });
+            throw new Error(data.error || 'Registration failed');
+        }
         return data;
     } catch (error) {
-        console.error('Registration Error:', error);
+        console.error('[API] Registration Network Error:', error);
         throw error;
     }
 };
@@ -133,6 +139,30 @@ export const followUser = async (targetId, followerId) => {
     }
 };
 
+export const fetchUserFollowers = async (userId) => {
+    try {
+        const response = await fetch(`${API_URL}/users/${userId}/followers`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch followers');
+        return data;
+    } catch (error) {
+        console.error('Fetch Followers Error:', error);
+        return [];
+    }
+};
+
+export const fetchUserFollowing = async (userId) => {
+    try {
+        const response = await fetch(`${API_URL}/users/${userId}/following`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch following');
+        return data;
+    } catch (error) {
+        console.error('Fetch Following Error:', error);
+        return [];
+    }
+};
+
 export const uploadUserAvatar = async (userId, imageUri) => {
     try {
         const formData = new FormData();
@@ -177,22 +207,143 @@ export const updateUserProfile = async (userId, updates) => {
     }
 };
 
-// Image Upload
-export const uploadImage = async (imageUri) => {
-    console.log(`[API] Uploading image from: ${imageUri}`);
+export const updateUserStatus = async (userId, status) => {
+    try {
+        const response = await fetch(`${API_URL}/users/${userId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to update status');
+        return data;
+    } catch (error) {
+        console.error('[API] Update Status Error:', error);
+        throw error;
+    }
+};
+
+export const blockUser = async (targetId, currentUserId) => {
+    try {
+        const response = await fetch(`${API_URL}/users/${targetId}/block`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to block user');
+        return data;
+    } catch (error) {
+        console.error('Block User Error:', error);
+        throw error;
+    }
+};
+
+export const unblockUser = async (targetId, currentUserId) => {
+    try {
+        const response = await fetch(`${API_URL}/users/${targetId}/unblock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to unblock user');
+        return data;
+    } catch (error) {
+        console.error('Unblock User Error:', error);
+        throw error;
+    }
+};
+
+export const reportUser = async (targetId, reporterId, reason, description = '') => {
+    try {
+        const response = await fetch(`${API_URL}/users/${targetId}/report`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reporterId, reason, description }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to report user');
+        return data;
+    } catch (error) {
+        console.error('Report User Error:', error);
+        throw error;
+    }
+};
+
+export const muteChat = async (targetId, userId) => {
+    try {
+        const response = await fetch(`${API_URL}/users/${targetId}/mute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to mute chat');
+        return data;
+    } catch (error) {
+        console.error('Mute Chat Error:', error);
+        throw error;
+    }
+};
+
+export const unmuteChat = async (targetId, userId) => {
+    try {
+        const response = await fetch(`${API_URL}/users/${targetId}/unmute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to unmute chat');
+        return data;
+    } catch (error) {
+        console.error('Unmute Chat Error:', error);
+        throw error;
+    }
+};
+
+export const fetchRelationship = async (targetId, currentUserId) => {
+    try {
+        const response = await fetch(`${API_URL}/users/${targetId}/relationship?currentUserId=${currentUserId}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch relationship');
+        return data; // { isBlocked, isMuted }
+    } catch (error) {
+        console.error('Fetch Relationship Error:', error);
+        return { isBlocked: false, isMuted: false };
+    }
+};
+
+
+// Media Upload (Image/Video)
+export const uploadMedia = async (uri, type = 'image') => {
+    const filename = uri.split('/').pop();
+    const match = /\.(\w+)$/.exec(filename);
+    const ext = match ? match[1].toLowerCase() : 'jpg';
+
+    // Determine mime type
+    let mimeType = 'image/jpeg';
+    if (type === 'video') {
+        mimeType = `video/${ext}`;
+    } else {
+        mimeType = `image/${ext === 'jpeg' || ext === 'jpg' ? 'jpeg' : ext}`;
+    }
+
+    console.log(`[API] Uploading media: ${filename}, type: ${mimeType}`);
+    console.log(`[API] Target URL: ${API_URL}/posts/upload-media`);
+
     try {
         const formData = new FormData();
-        const filename = imageUri.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : `image`;
+        const fileUri = Platform.OS === 'ios' ? uri.replace('file://', '') : uri;
 
-        formData.append('image', {
-            uri: Platform.OS === 'android' ? imageUri : imageUri.replace('file://', ''),
-            name: filename || 'image.jpg',
-            type: type || 'image/jpeg'
+        formData.append('media', {
+            uri: fileUri,
+            name: filename || (type === 'video' ? 'video.mp4' : 'image.jpg'),
+            type: mimeType
         });
 
-        const response = await fetch(`${API_URL}/posts/upload-image`, {
+        const response = await fetch(`${API_URL}/posts/upload-media`, {
             method: 'POST',
             body: formData,
             headers: {
@@ -201,14 +352,131 @@ export const uploadImage = async (imageUri) => {
         });
 
         const data = await response.json();
-        console.log(`[API] Upload result:`, data);
-        if (!response.ok) throw new Error(data.error || 'Upload failed');
-        return data.imageUrl; // Returns the public URL
+        console.log(`[API] Response status: ${response.status}`, data);
+        if (!response.ok) throw new Error(data.error || `Upload failed (${response.status})`);
+        return data.url;
     } catch (error) {
-        console.error('[API] Error uploading image:', error);
+        console.error('[API] Media Upload Error:', error.message);
         throw error;
     }
 };
+
+export const fetchReels = async (userId) => {
+    try {
+        const url = userId ? `${API_URL}/posts/reels?userId=${userId}` : `${API_URL}/posts/reels`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch reels');
+        return data;
+    } catch (error) {
+        console.error('Fetch Reels Error:', error);
+        return [];
+    }
+};
+
+export const fetchUserReels = async (userId, currentUserId) => {
+    try {
+        const url = currentUserId
+            ? `${API_URL}/users/${userId}/reels?currentUserId=${currentUserId}`
+            : `${API_URL}/users/${userId}/reels`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch user reels');
+        return data;
+    } catch (error) {
+        console.error('Fetch User Reels Error:', error);
+        return [];
+    }
+};
+
+// --- Verification System ---
+
+export const applyForVerification = async (formData) => {
+    try {
+        const response = await fetch(`${API_URL}/users/apply-verification`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to submit application');
+        return data;
+    } catch (error) {
+        console.error('Apply Verification Error:', error);
+        throw error;
+    }
+};
+
+export const fetchVerificationStatus = async (userId) => {
+    try {
+        const response = await fetch(`${API_URL}/users/verification-status/${userId}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch status');
+        return data;
+    } catch (error) {
+        console.error('Fetch Verification Status Error:', error);
+        return { status: 'none' };
+    }
+};
+
+export const fetchAdminVerificationRequests = async () => {
+    try {
+        const response = await fetch(`${API_URL}/users/admin/verification-requests`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch requests');
+        return data;
+    } catch (error) {
+        console.error('Admin Fetch Requests Error:', error);
+        return [];
+    }
+};
+
+export const processVerificationAction = async (requestId, action, adminId) => {
+    try {
+        const response = await fetch(`${API_URL}/users/admin/verify-action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId, action, adminId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to process action');
+        return data;
+    } catch (error) {
+        console.error('Process Verification Action Error:', error);
+        throw error;
+    }
+};
+
+export const subscribeToBlue = async (userId) => {
+    try {
+        const response = await fetch(`${API_URL}/subscriptions/subscribe`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, plan: 'blue' })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Subscription failed');
+        return data;
+    } catch (error) {
+        console.error('Subscribe to Blue Error:', error);
+        throw error;
+    }
+};
+
+export const fetchSubscriptionStatus = async (userId) => {
+    try {
+        const response = await fetch(`${API_URL}/subscriptions/status/${userId}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch status');
+        return data;
+    } catch (error) {
+        console.error('Fetch Subscription Status Error:', error);
+        throw error;
+    }
+};
+
+// Legacy support if needed, but we can alias it
+export const uploadImage = (uri) => uploadMedia(uri, 'image');
 
 export const createPost = async (postData) => {
     try {
@@ -255,6 +523,22 @@ export const deletePost = async (postId, userId) => {
     } catch (error) {
         console.error('Delete Post Error:', error);
         throw error;
+    }
+};
+
+
+
+export const recordReelView = async (postId) => {
+    try {
+        const response = await fetch(`${API_URL}/posts/${postId}/view`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        return data.success;
+    } catch (error) {
+        console.error('Record Reel View Error:', error);
+        return false;
     }
 };
 
@@ -562,6 +846,7 @@ export const forwardMessage = async (messageId, userId, recipientId) => {
 
 export const uploadFile = async (uri) => {
     try {
+        console.log(`[API] Starting upload for URI: ${uri}`);
         const formData = new FormData();
         const filename = uri.split('/').pop();
         const match = /\.(\w+)$/.exec(filename);
@@ -572,30 +857,35 @@ export const uploadFile = async (uri) => {
             type = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
         } else if (['m4a', 'mp3', 'wav', 'aac'].includes(ext)) {
             type = ext === 'm4a' ? 'audio/x-m4a' : `audio/${ext}`;
+        } else if (ext === 'pdf') {
+            type = 'application/pdf';
+        } else if (['doc', 'docx'].includes(ext)) {
+            type = 'application/msword';
         } else {
             type = 'application/octet-stream';
         }
 
+        const cleanUri = Platform.OS === 'android' ? uri : uri.replace('file://', '');
+
         formData.append('file', {
-            uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+            uri: cleanUri,
             name: filename || 'file',
             type
         });
 
+        console.log(`[API] Uploading to: ${API_URL}/upload`);
         const response = await fetch(`${API_URL}/upload`, {
             method: 'POST',
             body: formData,
-            headers: {
-                'Accept': 'application/json',
-                // Content-Type header excluded to let fetch generate boundary
-            }
         });
 
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Upload failed');
+        console.log(`[API] Upload successful: ${data.url}`);
         return data.url;
     } catch (error) {
         console.error('File Upload Error:', error);
+        // Fallback or retry logic could go here
         throw error;
     }
 };
@@ -716,3 +1006,45 @@ export const fetchLinkMetadata = async (url) => {
         return null; // Return null gracefully on failure
     }
 };
+
+export const clearChat = async (userId, otherUserId) => {
+    try {
+        const response = await fetch(`${API_URL}/messages/clear/${userId}/${otherUserId}`, {
+            method: 'DELETE',
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to clear chat');
+        return data;
+    } catch (error) {
+        console.error('Clear Chat Error:', error);
+        throw error;
+    }
+};
+
+export const fetchGifsFromProxy = async (query = '') => {
+    try {
+        const endpoint = query
+            ? `${API_URL}/giphy/v1/search?q=${encodeURIComponent(query)}`
+            : `${API_URL}/giphy/v1/trending`;
+
+        const response = await fetch(endpoint);
+        const data = await response.json();
+        return data.data;
+    } catch (error) {
+        console.error('Error fetching GIFs from proxy:', error);
+        return [];
+    }
+};
+
+export const fetchCommunityMembers = async (communityId) => {
+    try {
+        const response = await fetch(`${API_URL}/communities/${communityId}/members`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch community members');
+        return data;
+    } catch (error) {
+        console.error('Fetch Community Members Error:', error);
+        return [];
+    }
+};
+

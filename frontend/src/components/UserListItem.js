@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { COLORS, GLASS, SIZES } from '../constants/theme';
-import { MessageCircle } from 'lucide-react-native';
+import { MessageCircle, BadgeCheck } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 
 export default function UserListItem({ user, onPress }) {
@@ -25,12 +25,20 @@ export default function UserListItem({ user, onPress }) {
                 borderWidth: 1
             }]}>
                 <View>
-                    <Image source={{ uri: user.avatar }} style={[styles.avatar, { borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]} />
+                    <Image
+                        source={{ uri: user.avatar || `https://i.pravatar.cc/150?u=${user.id}` }}
+                        style={[styles.avatar, { borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
+                    />
                     {user.isOnline && <View style={[styles.onlineBadge, { borderColor: isDark ? themeColors.bgCard : themeColors.bgCardLight }]} />}
                 </View>
                 <View style={styles.info}>
                     <View style={styles.nameRow}>
                         <Text style={[styles.name, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]} numberOfLines={1}>{user.name}</Text>
+                        {user.isVerified ? (
+                            <BadgeCheck size={14} color="#FFD700" style={{ marginLeft: 4 }} />
+                        ) : user.subscriptionType === 'blue' ? (
+                            <BadgeCheck size={14} color="#4B9CD3" style={{ marginLeft: 4 }} />
+                        ) : null}
                         {user.lastMessageTime && (
                             <Text style={[styles.time, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>{formatTime(user.lastMessageTime)}</Text>
                         )}

@@ -2,19 +2,20 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { StyleSheet, View, Platform } from 'react-native';
-import { Home, Search, MessageCircle, User, PlusSquare, Grid } from 'lucide-react-native';
+import { Home, Compass, Mail, Users, UserCircle, Clapperboard, PlaySquare } from 'lucide-react-native';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import CreatePostScreen from '../screens/CreatePostScreen';
 import ExploreScreen from '../screens/ExploreScreen';
 import MessagesScreen from '../screens/MessagesScreen';
+import ReelsScreen from '../screens/ReelsScreen';
 import CommunitiesScreen from '../screens/CommunitiesScreen';
 import { COLORS } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 
-export default function MainTabs({ user, onOpenSettings, onEditProfile, onOpenChat, onViewProfile, onOpenNotifications, onOpenAdManagement, onOpenCommunity, onCreateCommunity, onCreatePost, initialTab, onTabChange }) {
+export default function MainTabs({ user, onOpenSettings, onEditProfile, onOpenChat, onOpenMessages, onViewProfile, onOpenNotifications, onOpenAdManagement, onOpenCommunity, onCreateCommunity, onCreatePost, onOpenMap, initialTab, onTabChange }) {
     const { isDark, themeColors } = useTheme();
 
     return (
@@ -37,7 +38,7 @@ export default function MainTabs({ user, onOpenSettings, onEditProfile, onOpenCh
         >
             <Tab.Screen
                 name="Home"
-                children={() => <HomeScreen user={user} onOpenNotifications={onOpenNotifications} onCreatePost={onCreatePost} />}
+                children={() => <HomeScreen user={user} onOpenNotifications={onOpenNotifications} onOpenMessages={onOpenMessages} onCreatePost={onCreatePost} onViewProfile={onViewProfile} />}
                 listeners={{
                     tabPress: () => onTabChange && onTabChange('Home'),
                 }}
@@ -52,14 +53,14 @@ export default function MainTabs({ user, onOpenSettings, onEditProfile, onOpenCh
             />
             <Tab.Screen
                 name="Explore"
-                children={() => <ExploreScreen onOpenChat={onOpenChat} onViewProfile={onViewProfile} onOpenCommunity={onOpenCommunity} />}
+                children={() => <ExploreScreen onOpenChat={onOpenChat} onViewProfile={onViewProfile} onOpenCommunity={onOpenCommunity} onOpenMap={onOpenMap} />}
                 listeners={{
                     tabPress: () => onTabChange && onTabChange('Explore'),
                 }}
                 options={{
                     tabBarIcon: ({ color, focused }) => (
                         <View style={styles.iconContainer}>
-                            <Search color={color} size={focused ? 28 : 26} strokeWidth={focused ? 2 : 2} />
+                            <Compass color={color} size={focused ? 28 : 26} strokeWidth={focused ? 2 : 2} />
                             {focused && <View style={styles.activeDot} />}
                         </View>
                     )
@@ -67,15 +68,15 @@ export default function MainTabs({ user, onOpenSettings, onEditProfile, onOpenCh
             />
 
             <Tab.Screen
-                name="Messages"
-                children={() => <MessagesScreen user={user} onOpenChat={onOpenChat} />}
+                name="Reels"
+                children={() => <ReelsScreen user={user} onViewProfile={onViewProfile} />}
                 listeners={{
-                    tabPress: () => onTabChange && onTabChange('Messages'),
+                    tabPress: () => onTabChange && onTabChange('Reels'),
                 }}
                 options={{
                     tabBarIcon: ({ color, focused }) => (
                         <View style={styles.iconContainer}>
-                            <MessageCircle color={color} size={focused ? 28 : 26} strokeWidth={focused ? 2 : 2} />
+                            <Clapperboard color={color} size={focused ? 28 : 26} strokeWidth={focused ? 2 : 2} />
                             {focused && <View style={styles.activeDot} />}
                         </View>
                     )
@@ -90,7 +91,7 @@ export default function MainTabs({ user, onOpenSettings, onEditProfile, onOpenCh
                 options={{
                     tabBarIcon: ({ color, focused }) => (
                         <View style={styles.iconContainer}>
-                            <Grid color={color} size={focused ? 28 : 26} strokeWidth={focused ? 2 : 2} />
+                            <Users color={color} size={focused ? 28 : 26} strokeWidth={focused ? 2 : 2} />
                             {focused && <View style={styles.activeDot} />}
                         </View>
                     )
@@ -98,14 +99,14 @@ export default function MainTabs({ user, onOpenSettings, onEditProfile, onOpenCh
             />
             <Tab.Screen
                 name="Profile"
-                children={() => <ProfileScreen targetUser={user} currentUser={user} onOpenSettings={onOpenSettings} onEditProfile={onEditProfile} onOpenAdManagement={onOpenAdManagement} />}
+                children={() => <ProfileScreen targetUser={user} currentUser={user} onOpenSettings={onOpenSettings} onEditProfile={onEditProfile} onOpenAdManagement={onOpenAdManagement} onViewProfile={onViewProfile} />}
                 listeners={{
                     tabPress: () => onTabChange && onTabChange('Profile'),
                 }}
                 options={{
                     tabBarIcon: ({ color, focused }) => (
                         <View style={styles.iconContainer}>
-                            <User color={color} size={focused ? 28 : 26} strokeWidth={focused ? 2 : 2} />
+                            <UserCircle color={color} size={focused ? 28 : 26} strokeWidth={focused ? 2 : 2} />
                             {focused && <View style={styles.activeDot} />}
                         </View>
                     )

@@ -17,28 +17,49 @@ const communityRoutes = require('./routes/communities');
 const storyRoutes = require('./routes/stories');
 const keysRoutes = require('./routes/keys');
 const adRoutes = require('./routes/ads');
+const locationRoutes = require('./routes/location');
+const giphyRoutes = require('./routes/giphy');
 
 const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Rate Limiting
+const rateLimit = require('express-rate-limit');
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 3000, // Increased limit for development
+    standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    message: { error: 'Too many requests from this IP, please try again after 15 minutes' }
+});
+
+// Apply to all routes
+app.use(limiter);
+
 // Security & Middleware
-app.use(helmet()); // Basic security headers
+app.use(helmet());
 app.use(cors({
     origin: process.env.NODE_ENV === 'production'
         ? ['https://your-production-app.com'] // REPLACE with your real app domain
         : '*',
     credentials: true
 }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '1mb' })); // Restricted in production
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
 // Dynamic Logging
 const logFormat = process.env.NODE_ENV === 'production' ? 'combined' : 'dev';
 app.use(morgan(logFormat));
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Global Request Logger
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
 
 // Attach Socket.io to request for use in routes
 app.use((req, res, next) => {
@@ -56,7 +77,10 @@ app.use('/api/communities', communityRoutes);
 app.use('/api/stories', storyRoutes);
 app.use('/api/keys', keysRoutes);
 app.use('/api/ads', adRoutes);
+app.use('/api/location', locationRoutes);
 app.use('/api/upload', require('./routes/upload'));
+app.use('/api/giphy', giphyRoutes);
+app.use('/api/subscriptions', require('./routes/subscriptions'));
 
 // Remote Logging for Mobile Debugging
 app.post('/api/logs', (req, res) => {
@@ -100,12 +124,72 @@ app.get('/', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*", // Allow all origins for development
+        origin: process.env.NODE_ENV === 'production'
+            ? ["https://your-production-app.com"]
+            : "*",
         methods: ["GET", "POST"]
     }
 });
 
 const { onlineUsers } = require('./socketStore');
+
+const handleMentions = async (senderId, content, entityId) => {
+    const mentionRegex = /@([a-zA-Z0-9_.]+)/g;
+    const matches = [...content.matchAll(mentionRegex)];
+    if (matches.length === 0) return;
+
+    const senderRes = await query('SELECT full_name FROM users WHERE id = $1', [senderId]);
+    const senderName = senderRes.rows[0]?.full_name || 'Someone';
+
+    for (const match of matches) {
+        const username = match[1];
+        try {
+            const userRes = await query('SELECT id FROM users WHERE username = $1', [username]);
+            if (userRes.rows.length > 0) {
+                const recipientId = userRes.rows[0].id;
+                if (recipientId === senderId) continue;
+
+                await query(
+                    `INSERT INTO notifications (recipient_id, sender_id, type, entity_id) VALUES ($1, $2, $3, $4)`,
+                    [recipientId, senderId, 'MENTION', entityId]
+                );
+
+                await sendPushToUser(
+                    recipientId,
+                    'New Mention',
+                    `${senderName} mentioned you: "${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"`,
+                    { type: 'MENTION', senderId, entityId }
+                );
+
+                const recipientSocketId = onlineUsers.get(recipientId);
+                if (recipientSocketId) {
+                    io.to(recipientSocketId).emit('notification_received', {
+                        type: 'MENTION',
+                        senderId,
+                        senderName,
+                        entityId
+                    });
+                }
+            }
+        } catch (error) {
+            console.error(`Error handling mention for ${username}:`, error);
+        }
+    }
+};
+
+
+// --- User Routes ---
+app.put('/users/:userId/status', async (req, res) => {
+    const { userId } = req.params;
+    const { status } = req.body;
+    try {
+        await query('UPDATE users SET status = $1 WHERE id = $2', [status, userId]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update status' });
+    }
+});
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
@@ -243,6 +327,27 @@ io.on('connection', (socket) => {
     // Handle sending messages
     socket.on('send_message', async (data) => {
         const { senderId, recipientId, content, replyToMessageId, encrypted, messageType, voiceUrl, voiceDuration, attachmentUrls } = data;
+        let replyDetails = null;
+
+        // Fetch reply details if exists
+        if (replyToMessageId) {
+            const replyRes = await query(`
+                SELECT cm.message, cm.sender_id, u.full_name 
+                FROM chat_messages cm
+                JOIN users u ON cm.sender_id = u.id
+                WHERE cm.id = $1
+            `, [replyToMessageId]);
+
+            if (replyRes.rows.length > 0) {
+                const r = replyRes.rows[0];
+                replyDetails = {
+                    id: replyToMessageId,
+                    content: r.message,
+                    senderId: r.sender_id,
+                    senderName: r.full_name
+                };
+            }
+        }
 
         // Save to database
         try {
@@ -268,7 +373,8 @@ io.on('connection', (socket) => {
                     messageType: message.message_type,
                     voiceUrl: message.voice_url,
                     voiceDuration: message.voice_duration,
-                    attachmentUrls: message.attachment_urls
+                    attachmentUrls: message.attachment_urls,
+                    replyToDetails: replyDetails || null
                 });
             }
 
@@ -296,30 +402,120 @@ io.on('connection', (socket) => {
                 voiceDuration: message.voice_duration,
                 attachmentUrls: message.attachment_urls
             });
+
+            // Handle mentions
+            handleMentions(senderId, content, message.id);
         } catch (error) {
+
             console.error('Error saving message:', error);
             socket.emit('message_error', { error: 'Failed to send message' });
         }
     });
 
-    // Handle sending Group (Lounge) messages
-    socket.on('send_group_message', async (data) => {
-        const { senderId, communityId, content, replyTo, messageType, voiceUrl, voiceDuration, attachmentUrls } = data;
+    // Handle Polls
+    socket.on('create_poll', async (data) => {
+        const { senderId, communityId, question, options } = data;
+        const pollData = {
+            question,
+            options: options.map(opt => ({ text: opt, votes: [] })),
+            voters: []
+        };
 
         try {
             const sql = `
-                INSERT INTO chat_messages (sender_id, group_id, message, reply_to_message_id, message_type, voice_url, voice_duration, attachment_urls)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                RETURNING id, sender_id, group_id, message, sent_at, reply_to_message_id, message_type, voice_url, voice_duration, attachment_urls
+                INSERT INTO chat_messages (sender_id, group_id, message, message_type, poll_data)
+                VALUES ($1, $2, $3, 'poll', $4)
+                RETURNING id, sender_id, group_id, message, message_type, poll_data, sent_at
             `;
-            const result = await query(sql, [senderId, communityId, content, replyTo, messageType || 'text', voiceUrl, voiceDuration, attachmentUrls]);
+            const result = await query(sql, [senderId, communityId, `Poll: ${question}`, JSON.stringify(pollData)]);
             const message = result.rows[0];
 
-            // Fetch sender info for broadcast
             const senderResult = await query('SELECT full_name FROM users WHERE id = $1', [senderId]);
             const senderName = senderResult.rows[0]?.full_name || 'Member';
 
-            // Broadcast to the community room
+            io.to(`community_${communityId}`).emit('receive_group_message', {
+                id: message.id,
+                senderId: message.sender_id,
+                senderName,
+                communityId: message.group_id,
+                content: message.message,
+                messageType: 'poll',
+                pollData: typeof message.poll_data === 'string' ? JSON.parse(message.poll_data) : message.poll_data,
+                timestamp: message.sent_at
+            });
+        } catch (error) {
+            console.error('Error creating poll:', error);
+        }
+    });
+
+    socket.on('vote_poll', async (data) => {
+        const { messageId, communityId, userId, optionIndex } = data;
+
+        try {
+            const fetchRes = await query('SELECT poll_data FROM chat_messages WHERE id = $1', [messageId]);
+            if (fetchRes.rows.length === 0) return;
+
+            let pollData = typeof fetchRes.rows[0].poll_data === 'string'
+                ? JSON.parse(fetchRes.rows[0].poll_data)
+                : fetchRes.rows[0].poll_data;
+
+            if (pollData.voters.includes(userId)) return; // Already voted
+
+            pollData.voters.push(userId);
+            pollData.options[optionIndex].votes.push(userId);
+
+            await query('UPDATE chat_messages SET poll_data = $1 WHERE id = $2', [JSON.stringify(pollData), messageId]);
+
+            io.to(`community_${communityId}`).emit('update_poll_results', {
+                messageId,
+                pollData
+            });
+        } catch (error) {
+            console.error('Error voting on poll:', error);
+        }
+    });
+
+    // Handle initial community PIN state sync if needed
+    socket.on('sync_community_pin', async ({ communityId }) => {
+        try {
+            const res = await query(`
+                SELECT c.pinned_message_id, m.message as content, u.full_name as sender_name, m.id as message_id
+                FROM communities c
+                LEFT JOIN chat_messages m ON c.pinned_message_id = m.id
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE c.id = $1
+            `, [communityId]);
+
+            if (res.rows[0]?.pinned_message_id) {
+                socket.emit('community_pinned_message_updated', {
+                    communityId,
+                    pinnedMessage: {
+                        id: res.rows[0].message_id,
+                        content: res.rows[0].content,
+                        senderName: res.rows[0].sender_name
+                    }
+                });
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    });
+
+    // Handle sending Group (Lounge) messages
+    socket.on('send_group_message', async (data) => {
+        const { senderId, communityId, content, replyTo, messageType, attachmentUrls } = data;
+        try {
+            const sql = `
+                INSERT INTO chat_messages (sender_id, group_id, message, reply_to_message_id, message_type, attachment_urls)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id, sender_id, group_id, message, sent_at, reply_to_message_id, message_type, attachment_urls
+            `;
+            const result = await query(sql, [senderId, communityId, content, replyTo, messageType || 'text', attachmentUrls]);
+            const message = result.rows[0];
+
+            const senderRes = await query('SELECT full_name FROM users WHERE id = $1', [senderId]);
+            const senderName = senderRes.rows[0]?.full_name || 'Member';
+
             io.to(`community_${communityId}`).emit('receive_group_message', {
                 id: message.id,
                 senderId: message.sender_id,
@@ -329,20 +525,10 @@ io.on('connection', (socket) => {
                 timestamp: message.sent_at,
                 replyTo: message.reply_to_message_id,
                 messageType: message.message_type,
-                voiceUrl: message.voice_url,
-                voiceDuration: message.voice_duration,
                 attachmentUrls: message.attachment_urls
             });
-
-            // Confirm to sender (optional if they already receive from the room)
-            // But usually good for ACK
-            socket.emit('group_message_sent', {
-                id: message.id,
-                success: true
-            });
         } catch (error) {
-            console.error('Error saving group message:', error);
-            socket.emit('message_error', { error: 'Failed to send group message' });
+            console.error('Error sending group message:', error);
         }
     });
 
@@ -485,9 +671,112 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Handle disconnect
+    // --- In-Chat Mini-Games ---
+    socket.on('game:start', async (data) => {
+        const { senderId, recipientId, gameType, initialState } = data;
+        const recipientSocketId = onlineUsers.get(recipientId);
+
+        console.log(`Game ${gameType} started by ${senderId} for ${recipientId}`);
+
+        if (recipientSocketId) {
+            io.to(recipientSocketId).emit('game:started', {
+                senderId,
+                gameType,
+                initialState
+            });
+        }
+    });
+
+    socket.on('game:move', async (data) => {
+        const { senderId, recipientId, messageId, move, gameState } = data;
+        const recipientSocketId = onlineUsers.get(recipientId);
+
+        console.log(`Game move by ${senderId} in game ${messageId}`);
+
+        // Update game state in DB (stored in the 'message' or 'poll_data' column, 
+        // preferring 'poll_data' for structured data if move is complex, 
+        // but for Tic-Tac-Toe, let's use a specialized game logic)
+        try {
+            await query(
+                'UPDATE chat_messages SET poll_data = $1 WHERE id = $2',
+                [JSON.stringify(gameState), messageId]
+            );
+
+            if (recipientSocketId) {
+                io.to(recipientSocketId).emit('game:moved', {
+                    senderId,
+                    messageId,
+                    move,
+                    gameState
+                });
+            }
+        } catch (error) {
+            console.error('Error updating game move:', error);
+        }
+    });
+
+    // WebRTC Call Signaling
+    socket.on('call:initiate', (data) => {
+        const { senderId, recipientId, offer, isVideo } = data;
+        const recipientSocketId = onlineUsers.get(recipientId);
+
+        console.log(`Call initiated from ${senderId} to ${recipientId}`);
+
+        if (recipientSocketId) {
+            io.to(recipientSocketId).emit('call:incoming', {
+                senderId,
+                offer,
+                isVideo
+            });
+        } else {
+            // Notify sender user is offline
+            socket.emit('call:error', { message: 'User is offline' });
+        }
+    });
+
+    socket.on('call:answer', (data) => {
+        const { senderId, recipientId, answer } = data; // senderId here is the one ANSWERING (callee), recipientId is the original CALLER
+        const callerSocketId = onlineUsers.get(recipientId);
+
+        console.log(`Call answered by ${senderId} for ${recipientId}`);
+
+        if (callerSocketId) {
+            io.to(callerSocketId).emit('call:answered', {
+                senderId, // The one answering
+                answer
+            });
+        }
+    });
+
+    socket.on('call:ice-candidate', (data) => {
+        const { senderId, recipientId, candidate } = data;
+        const targetSocketId = onlineUsers.get(recipientId);
+
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('call:ice-candidate', {
+                senderId,
+                candidate
+            });
+        }
+    });
+
+    socket.on('call:reject', (data) => {
+        const { senderId, recipientId } = data;
+        const callerSocketId = onlineUsers.get(recipientId);
+        if (callerSocketId) {
+            io.to(callerSocketId).emit('call:rejected', { senderId });
+        }
+    });
+
+    socket.on('call:end', (data) => {
+        const { senderId, recipientId } = data;
+        const targetSocketId = onlineUsers.get(recipientId);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('call:ended', { senderId });
+        }
+    });
+
     socket.on('disconnect', () => {
-        // Find and remove user
         for (const [userId, socketId] of onlineUsers.entries()) {
             if (socketId === socket.id) {
                 onlineUsers.delete(userId);
@@ -499,7 +788,25 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, () => {
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error(`[Global Error Handler] ${err.stack}`);
+
+    const statusCode = err.status || 500;
+    const response = {
+        error: process.env.NODE_ENV === 'production'
+            ? 'An internal server error occurred'
+            : err.message
+    };
+
+    if (process.env.NODE_ENV !== 'production') {
+        response.stack = err.stack;
+    }
+
+    res.status(statusCode).json(response);
+});
+
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Socket.io ready for real-time messaging`);
 });

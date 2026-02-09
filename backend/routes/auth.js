@@ -14,10 +14,16 @@ router.post('/register', async (req, res) => {
         return res.status(400).json({ error: 'Please provide all required fields' });
     }
 
+    if (!email.toLowerCase().endsWith('@joyuniversity.edu.in')) {
+        return res.status(400).json({ error: 'Registration is restricted to @joyuniversity.edu.in emails only' });
+    }
+
     try {
         // Check if user exists (email or username)
-        const userCheck = await query('SELECT * FROM users WHERE email = $1 OR username = $2', [email, username]);
+        console.log('[Auth] Checking existence for Email:', email, 'Username:', username);
+        const userCheck = await query('SELECT id, email, username FROM users WHERE email = $1 OR username = $2', [email, username]);
         if (userCheck.rows.length > 0) {
+            console.log('[Auth] Duplicate found:', userCheck.rows[0]);
             return res.status(400).json({ error: 'User with this email or username already exists' });
         }
 
@@ -25,9 +31,8 @@ router.post('/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        // Insert user
         const newUserMatches = await query(
-            'INSERT INTO users (full_name, email, password_hash, role, department, username) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, email, role, username',
+            'INSERT INTO users (full_name, email, password_hash, role, department, username) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, email, role, username, is_verified, subscription_type, subscription_expiry',
             [fullName, email, passwordHash, role || 'Student', department, username]
         );
 
@@ -39,11 +44,16 @@ router.post('/register', async (req, res) => {
         res.json({
             success: true,
             token,
-            user: newUser
+            user: {
+                ...newUser,
+                isVerified: newUser.is_verified,
+                subscriptionType: newUser.subscription_type,
+                subscriptionExpiry: newUser.subscription_expiry
+            }
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error during registration' });
+        console.error('[Auth] Registration Database Error:', err);
+        res.status(500).json({ error: err.message || 'Server error during registration' });
     }
 });
 
@@ -89,7 +99,10 @@ router.post('/login', async (req, res) => {
                 department: user.department,
                 bio: user.bio_metadata?.bio,
                 location: user.bio_metadata?.location,
-                stats: user.bio_metadata?.stats
+                stats: user.bio_metadata?.stats,
+                isVerified: user.is_verified,
+                subscriptionType: user.subscription_type,
+                subscriptionExpiry: user.subscription_expiry
             }
         });
     } catch (err) {
@@ -102,7 +115,7 @@ router.post('/login', async (req, res) => {
 router.post('/verify', async (req, res) => {
     const { email } = req.body;
     // Simple check without DB for the initial screen
-    const isVerified = email && (email.endsWith('.edu') || email.includes('.ac.'));
+    const isVerified = email && email.toLowerCase().endsWith('@joyuniversity.edu.in');
 
     if (isVerified) {
         res.json({ success: true, message: 'Email verified' });

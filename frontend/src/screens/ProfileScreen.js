@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Image, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, Animated, Modal, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, View, Text, Image, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, Animated, Modal, Platform, RefreshControl, Pressable, FlatList } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { Settings, MapPin, Link as LinkIcon, Edit3, Grid, Bookmark, ArrowLeft, MessageCircle, UserPlus, UserCheck, Users, Sparkles, Trash2, Monitor } from 'lucide-react-native';
+import { Settings, MapPin, Link as LinkIcon, Edit3, Grid, Bookmark, ArrowLeft, MessageCircle, UserPlus, UserCheck, Users, Sparkles, Trash2, Monitor, Image as ImageIcon, X, User, Clapperboard, Video as VideoIcon, BadgeCheck } from 'lucide-react-native';
+import { Video, ResizeMode } from 'expo-av';
+import ReelItem from '../components/ReelItem';
 import { COLORS, GLASS, SIZES } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
-import { fetchUserProfile, fetchUserByUsername, followUser, fetchUserPosts, deletePost } from '../services/api';
+import { fetchUserProfile, fetchUserByUsername, followUser, fetchUserPosts, deletePost, fetchUserFollowers, fetchUserFollowing, updateUserStatus, fetchReels, fetchUserReels, likePost, addComment, fetchComments, recordReelView } from '../services/api';
 import PostCard from '../components/PostCard';
+import UserListItem from '../components/UserListItem';
 import { Alert } from 'react-native';
+import GlobalImageViewer from '../components/GlobalImageViewer';
 
 const { width } = Dimensions.get('window');
 
-export default function ProfileScreen({ targetUser, currentUser, onOpenSettings, onEditProfile, onOpenAdManagement, onBack, onOpenChat }) {
+export default function ProfileScreen({ targetUser, currentUser, onOpenSettings, onEditProfile, onOpenAdManagement, onBack, onOpenChat, onViewProfile }) {
     const { themeColors, isDark } = useTheme();
     const [profileData, setProfileData] = useState(null);
     const [loading, setLoading] = useState(!targetUser);
@@ -22,8 +26,21 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
     const [loadingPosts, setLoadingPosts] = useState(false);
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [postToDelete, setPostToDelete] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [lightboxVisible, setLightboxVisible] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const scrollRef = React.useRef(null);
+    const postLayouts = React.useRef({}).current;
     const deleteScale = React.useRef(new Animated.Value(0.8)).current;
     const deleteOpacity = React.useRef(new Animated.Value(0)).current;
+    const [connectionsModalVisible, setConnectionsModalVisible] = useState(false);
+    const [connectionsTab, setConnectionsTab] = useState('Followers');
+    const [connectionsList, setConnectionsList] = useState([]);
+    const [loadingConnections, setLoadingConnections] = useState(false);
+    const [userReels, setUserReels] = useState([]);
+    const [loadingReels, setLoadingReels] = useState(false);
+    const [reelModalVisible, setReelModalVisible] = useState(false);
+    const [selectedReel, setSelectedReel] = useState(null);
 
     const isOwnProfile = (currentUser?.id && targetUser?.id) ? (currentUser.id == targetUser.id) : !onBack;
 
@@ -42,10 +59,10 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
         }
     }, [targetUser?.id, targetUser?.username]);
 
-    const loadProfile = async () => {
+    const loadProfile = async (silent = false) => {
         if (!targetUser?.id && !targetUser?.username) return;
 
-        setLoading(true);
+        if (!silent) setLoading(true);
         try {
             console.log(`[ProfileScreen] Loading profile for: ${targetUser.id || targetUser.username}`);
             let data;
@@ -59,7 +76,7 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
         } catch (error) {
             console.error('[ProfileScreen] Failed to load profile:', error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -90,24 +107,60 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
         }
     };
 
+    const handleImagePress = (uri) => {
+        setSelectedImage(uri);
+        setLightboxVisible(true);
+    };
+
     useEffect(() => {
         const userId = profileData?.id || targetUser?.id;
-        if (userId && activeTab === 'Activity') {
-            loadPosts(userId);
+        if (userId) {
+            if (activeTab === 'Activity') {
+                loadPosts(userId);
+            } else if (activeTab === 'Reels') {
+                loadUserReels(userId);
+            }
         }
     }, [profileData?.id, targetUser?.id, activeTab]);
 
-    const loadPosts = async (userId) => {
-        setLoadingPosts(true);
+    const loadUserReels = async (userId) => {
+        setLoadingReels(true);
+        try {
+            const reels = await fetchUserReels(userId, currentUser?.id);
+            setUserReels(reels);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingReels(false);
+        }
+    };
+
+    const loadPosts = async (userId, silent = false) => {
+        if (!silent) setLoadingPosts(true);
         try {
             const posts = await fetchUserPosts(userId, currentUser?.id);
             setUserPosts(posts);
         } catch (e) {
             console.error(e);
         } finally {
-            setLoadingPosts(false);
+            if (!silent) setLoadingPosts(false);
         }
     };
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        const userId = profileData?.id || targetUser?.id;
+        try {
+            await Promise.all([
+                loadProfile(true),
+                userId ? loadPosts(userId, true) : Promise.resolve()
+            ]);
+        } catch (error) {
+            console.error('[ProfileScreen] Refresh failed:', error);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [profileData?.id, targetUser?.id, targetUser?.username, currentUser?.id]);
 
     const showDeleteConfirm = (postId) => {
         setPostToDelete(postId);
@@ -146,6 +199,71 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
         }
     };
 
+    const handleOpenConnections = async (tab) => {
+        const userId = profileData?.id || targetUser?.id;
+        if (!userId) return;
+
+        setConnectionsTab(tab);
+        setConnectionsModalVisible(true);
+        setLoadingConnections(true);
+        try {
+            const list = tab === 'Followers'
+                ? await fetchUserFollowers(userId)
+                : await fetchUserFollowing(userId);
+            setConnectionsList(list);
+        } catch (error) {
+            console.error('Failed to fetch connections:', error);
+        } finally {
+            setLoadingConnections(false);
+        }
+    };
+
+    const handleConnectionPress = (user) => {
+        setConnectionsModalVisible(false);
+        if (targetUser && targetUser.id === user.id) return; // Already on this profile
+        // If we are on ProfileScreen, we usually navigation.push or update targetUser
+        // But ProfileScreen here is a component.
+        // We need to notify the parent to view this user.
+        if (onViewProfile) {
+            onViewProfile(user);
+        }
+
+    };
+
+    const handleReelPress = (reel) => {
+        setSelectedReel(reel);
+        setReelModalVisible(true);
+        recordReelView(reel.id);
+    };
+
+    const handleReelLike = async (reelId) => {
+        if (!selectedReel) return;
+        // Optimistic update
+        setSelectedReel(prev => ({
+            ...prev,
+            isLiked: !prev.isLiked,
+            likes: prev.isLiked ? prev.likes - 1 : prev.likes + 1
+        }));
+        setUserReels(prev => prev.map(r => r.id === reelId ? {
+            ...r,
+            isLiked: !r.isLiked,
+            likes: r.isLiked ? r.likes - 1 : r.likes + 1
+        } : r));
+
+        try {
+            await likePost(reelId, currentUser.id);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const handleOpenReelComments = async (reel) => {
+        // This would ideally open a comment modal on top of the reel modal
+        // For simplicity, we can reuse logic if we extracted it, or just show an alert for now "Comments on profile reel view coming soon"
+        // Or implement a simple comment fetch
+        Alert.alert("Comments", "View comments in the main Reels tab for optimal experience.");
+    };
+
     if (loading && !profileData) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -178,7 +296,10 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
             bio: effectiveUser.bio || "No bio yet.",
             stats: effectiveUser.stats || { connections: 0, posts: 0, views: 0 },
             avatar: effectiveUser.avatar || ("https://i.pravatar.cc/150?u=" + (effectiveUser.id || effectiveUser.full_name || "User")),
-            coverImage: effectiveUser.coverImage || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800&fit=crop"
+            coverImage: effectiveUser.coverImage || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800&fit=crop",
+            isVerified: effectiveUser.isVerified,
+            subscriptionType: effectiveUser.subscriptionType,
+            subscriptionExpiry: effectiveUser.subscriptionExpiry
         };
     } catch (e) {
         console.error("Error formatting display profile:", e);
@@ -188,23 +309,58 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
         <View style={[styles.container, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight }]}>
             {/* Background Aura Glows removed for Organic Earth style */}
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            <ScrollView
+                ref={scrollRef}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 100 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={[themeColors.accentPrimary]}
+                        tintColor={isDark ? '#FFF' : themeColors.accentPrimary}
+                    />
+                }
+            >
                 {/* Header Cover */}
-                <View style={[styles.coverContainer, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgLight, borderBottomWidth: 1, borderBottomColor: isDark ? 'transparent' : 'rgba(0,0,0,0.05)' }]}>
-                    {/* Cover image removed as per user request */}
-
-                    {isDark && (
-                        <LinearGradient
-                            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.2)']}
+                <View style={[styles.coverContainer, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgLight }]}>
+                    <TouchableOpacity
+                        style={StyleSheet.absoluteFill}
+                        activeOpacity={0.9}
+                        onPress={() => handleImagePress(displayProfile.avatar)}
+                    >
+                        <Image
+                            source={{ uri: displayProfile.avatar || "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=800&fit=crop" }}
                             style={StyleSheet.absoluteFill}
+                            resizeMode="cover"
                         />
-                    )}
+                        {effectiveUser.status && (
+                            <View style={styles.statusBadgeOnAvatar}>
+                                <Text style={styles.statusAvatarText}>
+                                    {[
+                                        { label: 'Studying', icon: '📖' },
+                                        { label: 'In Class', icon: '🏫' },
+                                        { label: 'Researching', icon: '🔬' },
+                                        { label: 'Coffee Break', icon: '☕' },
+                                        { label: 'Deep Focus', icon: '🎯' },
+                                        { label: 'Available', icon: '✅' }
+                                    ].find(s => s.label === effectiveUser.status)?.icon || '✨'}
+                                </Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+
+                    {/* Readable Overlay Gradients */}
+                    <LinearGradient
+                        colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.7)']}
+                        style={StyleSheet.absoluteFill}
+                    />
 
                     {/* Back Button */}
                     {onBack && (
                         <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-                            <View style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)' }]}>
-                                <ArrowLeft color={isDark ? "#FFFFFF" : themeColors.textMainLight} size={20} />
+                            <View style={[styles.iconButton, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+                                <ArrowLeft color="#FFFFFF" size={20} />
                             </View>
                         </TouchableOpacity>
                     )}
@@ -221,62 +377,70 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                     {/* Settings Button */}
                     {isOwnProfile && (
                         <TouchableOpacity style={styles.settingsBtn} onPress={onOpenSettings}>
-                            <View style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)' }]}>
-                                <Settings color={isDark ? "#FFFFFF" : themeColors.textMainLight} size={20} />
+                            <View style={[styles.iconButton, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+                                <Settings color="#FFFFFF" size={20} />
                             </View>
                         </TouchableOpacity>
                     )}
+
+                    {/* Name/Handle/Meta Overlayed on Banner Bottom */}
+                    <View style={styles.bannerInfoOverlay}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={[styles.name, { color: '#FFFFFF', fontFamily: 'PlayfairDisplay-Bold' }]}>
+                                {displayProfile.name}
+                            </Text>
+                            {displayProfile.isVerified ? (
+                                <BadgeCheck size={18} color="#FFD700" style={{ marginLeft: 6 }} />
+                            ) : displayProfile.subscriptionType === 'blue' ? (
+                                <BadgeCheck size={18} color="#4B9CD3" style={{ marginLeft: 6 }} />
+                            ) : null}
+                        </View>
+                        <View style={styles.handleRow}>
+                            <Text style={[styles.handle, { color: 'rgba(255,255,255,0.8)' }]}>
+                                @{displayProfile.username}
+                            </Text>
+                            {displayProfile.role && (
+                                <View style={[styles.badge, { backgroundColor: themeColors.accentPrimary }]}>
+                                    <Text style={[styles.badgeText, { color: '#FFFFFF' }]}>{displayProfile.role}</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Meta Info on Banner */}
+                        <View style={[styles.locationGroup, { marginTop: 8 }]}>
+                            <View style={styles.metaRow}>
+                                <MapPin size={14} color="#FFFFFF" />
+                                <Text style={[styles.metaText, { color: '#FFFFFF' }]}>{displayProfile.location || 'Student City'}</Text>
+                            </View>
+                            <View style={styles.metaRow}>
+                                <LinkIcon size={14} color="#FFFFFF" />
+                                <Text style={[styles.metaText, { color: 'rgba(255,255,255,0.9)' }]}>UniSphere.me/{displayProfile.username}</Text>
+                            </View>
+                        </View>
+                    </View>
                 </View>
+
+
 
                 {/* Profile Information Section */}
                 <View style={styles.profileContent}>
                     <View style={styles.mainInfo}>
-                        <View style={[styles.avatarBorder, { backgroundColor: themeColors.accentPrimary, padding: 4 }]}>
-                            {displayProfile.avatar ? (
-                                <Image source={{ uri: displayProfile.avatar }} style={styles.avatar} />
-                            ) : (
-                                <View style={[styles.avatar, { backgroundColor: isDark ? themeColors.bgCard : themeColors.bgCardLight, justifyContent: 'center', alignItems: 'center' }]}>
-                                    <Users size={32} color={themeColors.textDim} />
-                                </View>
-                            )}
-                            <View style={[styles.onlineStatus, { borderColor: isDark ? themeColors.bgDark : themeColors.bgLight }]} />
-                        </View>
-
-                        <View style={styles.nameSection}>
-                            <Text style={[styles.name, {
-                                color: isDark ? themeColors.textMain : themeColors.textMainLight,
-                                fontFamily: 'PlayfairDisplay-Bold',
-                            }]}>{displayProfile.name}</Text>
-                            <View style={styles.handleRow}>
-                                <Text style={[styles.handle, {
-                                    color: isDark ? themeColors.textMuted : themeColors.textMutedLight,
-                                }]}>@{displayProfile.username}</Text>
-                                <View style={[styles.badge, { backgroundColor: themeColors.accentPrimary }]}>
-                                    <Text style={[styles.badgeText, { color: '#FFFFFF' }]}>{displayProfile.role || 'Explorer'}</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.locationGroup}>
-                                <View style={styles.metaRow}>
-                                    <MapPin size={14} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
-                                    <Text style={[styles.metaText, { color: isDark ? themeColors.textMuted : themeColors.textMutedLight }]}>{displayProfile.location || 'Student City'}</Text>
-                                </View>
-                                <View style={styles.metaRow}>
-                                    <LinkIcon size={14} color={isDark ? themeColors.textMuted : themeColors.textMutedLight} />
-                                    <Text style={[styles.metaText, { color: themeColors.accentPrimary }]}>unisphere.me/{displayProfile.username}</Text>
-                                </View>
-                            </View>
-                        </View>
+                        {/* Avatar and Meta Info removed as per user request - banner used instead */}
                     </View>
 
                     {/* Aura Stats Section */}
                     <View style={styles.auraStatsGrid}>
-                        <StatCard
-                            label="Connections"
-                            value={displayProfile.stats.connections}
-                            icon={Users}
-                            color={themeColors.sage}
-                        />
+                        <TouchableOpacity
+                            style={{ flex: 1 }}
+                            onPress={() => handleOpenConnections('Followers')}
+                        >
+                            <StatCard
+                                label="Connections"
+                                value={displayProfile.stats.connections}
+                                icon={Users}
+                                color={themeColors.sage}
+                            />
+                        </TouchableOpacity>
                         <TouchableOpacity
                             style={{ flex: 1 }}
                             onPress={() => setActiveTab('Activity')}
@@ -364,6 +528,20 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                             <Text style={[styles.tabText, { color: activeTab === 'Activity' ? (isDark ? themeColors.textMain : themeColors.textMainLight) : (isDark ? themeColors.textDim : themeColors.textDimLight) }]}>Activity</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
+                            style={[styles.tabItem, activeTab === 'Reels' && styles.tabItemActive]}
+                            onPress={() => setActiveTab('Reels')}
+                        >
+                            <Clapperboard size={20} color={activeTab === 'Reels' ? themeColors.accentPrimary : (isDark ? themeColors.textDim : themeColors.textDimLight)} />
+                            <Text style={[styles.tabText, { color: activeTab === 'Reels' ? (isDark ? themeColors.textMain : themeColors.textMainLight) : (isDark ? themeColors.textDim : themeColors.textDimLight) }]}>Reels</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.tabItem, activeTab === 'Gallery' && styles.tabItemActive]}
+                            onPress={() => setActiveTab('Gallery')}
+                        >
+                            <ImageIcon size={20} color={activeTab === 'Gallery' ? themeColors.accentPrimary : (isDark ? themeColors.textDim : themeColors.textDimLight)} />
+                            <Text style={[styles.tabText, { color: activeTab === 'Gallery' ? (isDark ? themeColors.textMain : themeColors.textMainLight) : (isDark ? themeColors.textDim : themeColors.textDimLight) }]}>Gallery</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
                             style={[styles.tabItem, activeTab === 'Saved' && styles.tabItemActive]}
                             onPress={() => setActiveTab('Saved')}
                         >
@@ -372,29 +550,83 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                         </TouchableOpacity>
                     </View>
 
-                    {/* Posts List */}
+                    {/* Posts / Gallery List */}
                     <View style={{ paddingBottom: 20 }}>
                         {loadingPosts ? (
                             <ActivityIndicator color={themeColors.accentPrimary} style={{ marginTop: 20 }} />
                         ) : activeTab === 'Activity' ? (
                             userPosts.length > 0 ? (
                                 userPosts.map(post => (
-                                    <PostCard
+                                    <View
                                         key={post.id}
-                                        {...post}
-                                        currentUser={currentUser}
-                                        onDelete={showDeleteConfirm}
-                                    />
+                                        onLayout={(event) => {
+                                            const { y } = event.nativeEvent.layout;
+                                            postLayouts[post.id] = y;
+                                        }}
+                                    >
+                                        <PostCard
+                                            {...post}
+                                            currentUser={currentUser}
+                                            onDelete={showDeleteConfirm}
+                                        />
+                                    </View>
                                 ))
                             ) : (
                                 <Text style={{ textAlign: 'center', color: isDark ? themeColors.textDim : themeColors.textDimLight, marginTop: 20 }}>No posts yet.</Text>
                             )
+                        ) : activeTab === 'Reels' ? (
+                            loadingReels ? (
+                                <ActivityIndicator color={themeColors.accentPrimary} style={{ marginTop: 20 }} />
+                            ) : userReels.length > 0 ? (
+                                <View style={styles.mediaGrid}>
+                                    {userReels.map((reel) => (
+                                        <TouchableOpacity
+                                            key={reel.id}
+                                            style={styles.mediaGridItem}
+                                            onPress={() => handleReelPress(reel)}
+                                        >
+                                            <Video
+                                                source={{ uri: reel.video }}
+                                                style={styles.gridImage}
+                                                resizeMode={ResizeMode.COVER}
+                                                shouldPlay={false}
+                                                isMuted={true}
+                                            />
+                                            <View style={styles.reelIconOverlay}>
+                                                <Clapperboard color="white" size={16} />
+                                                <Text style={styles.reelOverlayText}>{reel.views || 0}</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            ) : (
+                                <Text style={{ textAlign: 'center', color: isDark ? themeColors.textDim : themeColors.textDimLight, marginTop: 20 }}>No reels shared yet.</Text>
+                            )
+                        ) : activeTab === 'Gallery' ? (
+                            (() => {
+                                const mediaPosts = userPosts.filter(p => p.image);
+                                return mediaPosts.length > 0 ? (
+                                    <View style={styles.mediaGrid}>
+                                        {mediaPosts.map((post) => (
+                                            <TouchableOpacity
+                                                key={post.id}
+                                                style={styles.mediaGridItem}
+                                                onPress={() => handleImagePress(post.image)}
+                                            >
+                                                <Image source={{ uri: post.image }} style={styles.gridImage} />
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                ) : (
+                                    <Text style={{ textAlign: 'center', color: isDark ? themeColors.textDim : themeColors.textDimLight, marginTop: 20 }}>No media found.</Text>
+                                );
+                            })()
                         ) : (
                             <Text style={{ textAlign: 'center', color: isDark ? themeColors.textDim : themeColors.textDimLight, marginTop: 20 }}>Saved posts coming soon.</Text>
                         )}
                     </View>
                 </View>
-            </ScrollView>
+            </ScrollView >
 
             <Modal
                 transparent
@@ -426,7 +658,106 @@ export default function ProfileScreen({ targetUser, currentUser, onOpenSettings,
                     </Animated.View>
                 </View>
             </Modal>
-        </View>
+
+            {/* Global Image Viewer */}
+            <GlobalImageViewer
+                visible={lightboxVisible}
+                imageUrl={selectedImage}
+                onClose={() => setLightboxVisible(false)}
+            />
+
+            {/* Connections Modal */}
+            <Modal
+                visible={connectionsModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setConnectionsModalVisible(false)}
+            >
+                <View style={styles.connectionsModalOverlay}>
+                    <TouchableOpacity
+                        style={{ flex: 1 }}
+                        activeOpacity={1}
+                        onPress={() => setConnectionsModalVisible(false)}
+                    />
+                    <View style={[styles.modalContainer, { backgroundColor: isDark ? themeColors.bgDark : themeColors.bgLight, height: '80%' }]}>
+                        <View style={styles.modalHandle} />
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: isDark ? themeColors.textMain : themeColors.textMainLight }]}>Connections</Text>
+                            <TouchableOpacity onPress={() => setConnectionsModalVisible(false)} style={styles.modalCloseBtn}>
+                                <X size={22} color={isDark ? themeColors.textMain : themeColors.textMainLight} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalTabs}>
+                            <TouchableOpacity
+                                style={[styles.modalTab, connectionsTab === 'Followers' && styles.modalTabActive, { borderBottomColor: themeColors.accentPrimary }]}
+                                onPress={() => handleOpenConnections('Followers')}
+                            >
+                                <Text style={[styles.modalTabText, { color: connectionsTab === 'Followers' ? themeColors.accentPrimary : (isDark ? themeColors.textDim : themeColors.textDimLight) }]}>Followers</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalTab, connectionsTab === 'Following' && styles.modalTabActive, { borderBottomColor: themeColors.accentPrimary }]}
+                                onPress={() => handleOpenConnections('Following')}
+                            >
+                                <Text style={[styles.modalTabText, { color: connectionsTab === 'Following' ? themeColors.accentPrimary : (isDark ? themeColors.textDim : themeColors.textDimLight) }]}>Following</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {loadingConnections ? (
+                            <ActivityIndicator size="large" color={themeColors.accentPrimary} style={{ marginTop: 40 }} />
+                        ) : (
+                            <FlatList
+                                data={connectionsList}
+                                keyExtractor={item => (item.id || Math.random()).toString()}
+                                renderItem={({ item }) => (
+                                    <UserListItem
+                                        user={item}
+                                        onPress={() => handleConnectionPress(item)}
+                                    />
+                                )}
+                                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+                                ListEmptyComponent={
+                                    <View style={{ alignItems: 'center', marginTop: 50 }}>
+                                        <Users size={48} color={isDark ? themeColors.textDim : themeColors.textDimLight} style={{ marginBottom: 16, opacity: 0.3 }} />
+                                        <Text style={{ color: isDark ? themeColors.textDim : themeColors.textDimLight }}>No connections yet.</Text>
+                                    </View>
+                                }
+                            />
+                        )}
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={reelModalVisible}
+                animationType="slide"
+                onRequestClose={() => setReelModalVisible(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'black' }}>
+                    <TouchableOpacity
+                        style={styles.closeReelBtn}
+                        onPress={() => setReelModalVisible(false)}
+                    >
+                        <X color="white" size={28} />
+                    </TouchableOpacity>
+                    {selectedReel && (
+                        <ReelItem
+                            item={selectedReel}
+                            isActive={true}
+                            bottomTabHeight={0}
+                            onLike={handleReelLike}
+                            onComment={handleOpenReelComments}
+                            onViewProfile={() => {
+                                setReelModalVisible(false);
+                                // already on profile, maybe check if it's the same user or different?
+                                // if it's a different user (e.g. shared reel), fetch that user.
+                                // But here we are viewing USER's reels, so it's the same user.
+                            }}
+                            onShare={() => { }} // Could implement share from here too
+                        />
+                    )}
+                </View>
+            </Modal>
+        </View >
     );
 }
 
@@ -452,16 +783,12 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    glowCircle: {
-        position: 'absolute',
-        width: 300,
-        height: 300,
-        borderRadius: 150,
-        opacity: 0.6,
-    },
     coverContainer: {
-        height: 280,
+        height: 450,
         width: '100%',
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+        overflow: 'hidden',
     },
     coverImage: {
     },
@@ -484,16 +811,20 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',
-        backgroundColor: 'rgba(0,0,0,0.2)'
+    },
+    bannerInfoOverlay: {
+        position: 'absolute',
+        bottom: 20,
+        left: 24,
+        right: 24,
     },
     profileContent: {
-        marginTop: -60,
+        marginTop: 0,
         paddingHorizontal: 24,
+        paddingTop: 24,
     },
     mainInfo: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        marginBottom: 32,
+        marginBottom: 24,
     },
     avatarBorder: {
         width: 104,
@@ -529,7 +860,7 @@ const styles = StyleSheet.create({
         paddingBottom: 4,
     },
     name: {
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: '900',
         letterSpacing: -1,
     },
@@ -555,7 +886,8 @@ const styles = StyleSheet.create({
     },
     locationGroup: {
         marginTop: 12,
-        gap: 6,
+        flexDirection: 'row',
+        gap: 12,
     },
     metaRow: {
         flexDirection: 'row',
@@ -609,6 +941,61 @@ const styles = StyleSheet.create({
         borderRadius: 50,
         bottom: -50,
         right: -50,
+        opacity: 0.2,
+    },
+    statusBadgeOnAvatar: {
+        position: 'absolute',
+        bottom: 20,
+        right: 20,
+        backgroundColor: '#FFF',
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#8B5CF6',
+        elevation: 5,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+    },
+    statusAvatarText: {
+        fontSize: 18,
+    },
+    statusPickerWrapper: {
+        paddingHorizontal: 24,
+        marginTop: 32,
+        marginBottom: 8,
+    },
+    statusLabel: {
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 2,
+        marginBottom: 16,
+    },
+    statusScroll: {
+        gap: 12,
+        paddingRight: 24,
+    },
+    statusItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: 'transparent',
+        backgroundColor: 'rgba(0,0,0,0.03)',
+    },
+    statusIcon: {
+        fontSize: 18,
+        marginRight: 8,
+    },
+    statusItemText: {
+        fontSize: 13,
+        fontWeight: '700',
     },
     bioWrapper: {
         marginBottom: 32,
@@ -618,7 +1005,6 @@ const styles = StyleSheet.create({
         padding: 24,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
     },
     bioLabel: {
         fontSize: 11,
@@ -689,11 +1075,85 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     tabItem: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        gap: 8,
+    },
+    modalContainer: {
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        overflow: 'hidden',
+        width: '100%',
+    },
+    modalHandle: {
+        width: 40,
+        height: 4,
+        backgroundColor: 'rgba(128,128,128,0.3)',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginTop: 12,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 20,
+        paddingHorizontal: 24,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    modalCloseBtn: {
+        position: 'absolute',
+        right: 24,
+        padding: 4,
+    },
+    modalTabs: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        marginBottom: 16,
+    },
+    modalTab: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderBottomWidth: 2,
+        borderBottomColor: 'transparent',
+    },
+    modalTabActive: {},
+    modalTabText: {
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    connectionItem: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 12,
-        marginRight: 24,
-        gap: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(128,128,128,0.05)',
+    },
+    connectionAvatarContainer: {
+        marginRight: 16,
+    },
+    connectionAvatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+    },
+    connectionInfo: {
+        flex: 1,
+    },
+    connectionName: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    connectionHandle: {
+        fontSize: 14,
+        marginTop: 2,
     },
     tabItemActive: {
         borderBottomWidth: 2,
@@ -762,5 +1222,81 @@ const styles = StyleSheet.create({
     buttonText: {
         fontSize: 16,
         fontWeight: '600',
+    },
+    mediaGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -2,
+    },
+    mediaGridItem: {
+        width: (width - 48) / 3, // Screen width - horizontal padding (24 * 2)
+        aspectRatio: 1,
+        padding: 2,
+    },
+    gridImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 8,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+    },
+    // Lightbox & Gallery Styles
+    lightboxOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.95)',
+    },
+    lightboxHeader: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 60 : 40,
+        right: 20,
+        zIndex: 100,
+    },
+    lightboxCloseBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    lightboxImageContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    lightboxImage: {
+        width: Dimensions.get('window').width,
+        height: Dimensions.get('window').height * 0.8,
+    },
+    connectionsModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'flex-end',
+        overflow: 'hidden',
+    },
+    // Reel Styles
+    reelIconOverlay: {
+        position: 'absolute',
+        bottom: 5,
+        left: 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4
+    },
+    reelOverlayText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: '600',
+        textShadowColor: 'rgba(0,0,0,0.5)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3
+    },
+    closeReelBtn: {
+        position: 'absolute',
+        top: 40,
+        right: 20,
+        zIndex: 100,
+        padding: 10,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        borderRadius: 20
     }
 });

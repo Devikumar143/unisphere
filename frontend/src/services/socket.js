@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
 const PRODUCTION_SOCKET_URL = 'https://unisphere-api.onrender.com';
-const DEVELOPMENT_SOCKET_URL = 'http://10.218.116.250:5001';
+const DEVELOPMENT_SOCKET_URL = 'http://10.188.11.250:5001';
 
 // __DEV__ is true during local development, false in production builds
 const SOCKET_URL = __DEV__ ? DEVELOPMENT_SOCKET_URL : PRODUCTION_SOCKET_URL;
@@ -37,8 +37,8 @@ export const disconnectSocket = () => {
     }
 };
 
-export const sendMessage = (senderId, recipientId, content, replyToMessageId = null, encrypted = false, messageType = 'text', voiceUrl = null, voiceDuration = null, attachmentUrls = []) => {
-    console.log('Sending message:', { senderId, recipientId, content, replyToMessageId, encrypted, messageType, attachmentUrls });
+export const sendMessage = (senderId, recipientId, content, replyToMessageId = null, encrypted = false, messageType = 'text', voiceUrl = null, voiceDuration = null, attachmentUrls = [], pollData = null) => {
+    console.log('Sending message:', { senderId, recipientId, content, replyToMessageId, encrypted, messageType, attachmentUrls, pollData });
     if (socket) {
         socket.emit('send_message', {
             senderId,
@@ -49,7 +49,8 @@ export const sendMessage = (senderId, recipientId, content, replyToMessageId = n
             messageType,
             voiceUrl,
             voiceDuration,
-            attachmentUrls
+            attachmentUrls,
+            pollData
         });
     } else {
         console.error('Socket not connected!');
@@ -210,4 +211,44 @@ export const offMessageUpdated = (callback) => {
     }
 };
 
+// Tic-Tac-Toe / Mini-Games
+export const startGame = (senderId, recipientId, gameType, initialState) => {
+    if (socket) {
+        socket.emit('game:start', { senderId, recipientId, gameType, initialState });
+    }
+};
+
+export const sendGameMove = (senderId, recipientId, messageId, move, gameState) => {
+    if (socket) {
+        socket.emit('game:move', { senderId, recipientId, messageId, move, gameState });
+    }
+};
+
+export const onGameStarted = (callback) => {
+    if (socket) {
+        socket.on('game:started', callback);
+    }
+};
+
+export const onGameMoved = (callback) => {
+    if (socket) {
+        socket.on('game:moved', callback);
+    }
+};
+
+export const offGameStarted = (callback) => {
+    if (socket) {
+        socket.off('game:started', callback);
+    }
+};
+
+export const offGameMoved = (callback) => {
+    if (socket) {
+        socket.off('game:moved', callback);
+    }
+};
+
 export const getSocket = () => socket;
+
+// --- WebRTC Signaling ---
+
