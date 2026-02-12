@@ -23,8 +23,10 @@ router.get('/', async (req, res) => {
 // Create a new ad/poster (Admin Only)
 router.post('/', authenticateToken, async (req, res) => {
     const { title, imageUrl, redirectUrl, category } = req.body;
+    console.log(`[Push-Debug] [Ads] Create Ad request from User ${req.user.id}:`, { title, imageUrl, category });
 
     if (!title || !imageUrl) {
+        console.error(`[Push-Debug] [Ads] Missing title or imageUrl`);
         return res.status(400).json({ error: 'Title and Image URL are required' });
     }
 

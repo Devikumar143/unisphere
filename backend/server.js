@@ -527,6 +527,33 @@ io.on('connection', (socket) => {
                 messageType: message.message_type,
                 attachmentUrls: message.attachment_urls
             });
+
+            // Handle mentions in group message
+            handleMentions(senderId, content, message.id);
+
+            // Notify other community members via push (optional but recommended)
+            const communityRes = await query('SELECT name FROM communities WHERE id = $1', [communityId]);
+            const communityName = communityRes.rows[0]?.name || 'Community';
+
+            // Get all other members of the community
+            const membersRes = await query('SELECT user_id FROM community_members WHERE community_id = $1 AND user_id != $2', [communityId, senderId]);
+
+            // For now, let's only notify them if they are NOT current recipients of the socket event
+            // (or just notify everyone who isn't the sender, as push behaves differently than sockets)
+            // To prevent massive spam, we might want to limit this or only do it for mentions.
+            // But per plan, we'll notify members.
+            for (const member of membersRes.rows) {
+                // Skip if they are online and in the community room (to reduce noise)
+                // However, socket room check is hard globally. 
+                // We'll just send push to everyone else.
+                await sendPushToUser(
+                    member.user_id,
+                    `New in ${communityName}`,
+                    `${senderName}: ${messageType === 'text' ? content : 'Sent an attachment'}`,
+                    { type: 'COMMUNITY_CHAT', communityId, senderId }
+                );
+            }
+
         } catch (error) {
             console.error('Error sending group message:', error);
         }

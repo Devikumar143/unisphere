@@ -5,49 +5,38 @@ import Constants from 'expo-constants';
 
 const isExpoGo = Constants?.appOwnership === 'expo' || Constants?.executionEnvironment === 'store-client';
 
-// Only set the handler if not in Expo Go to avoid the immediate error screen
-if (!isExpoGo) {
-    try {
-        Notifications.setNotificationHandler({
-            handleNotification: async () => ({
-                shouldShowAlert: true,
-                shouldPlaySound: true,
-                shouldSetBadge: false,
-            }),
-        });
-    } catch (e) {
-        console.warn('NotificationHandler setup failed:', e);
-    }
+// Enable the handler even in Expo Go for testing visibility
+try {
+    Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+        }),
+    });
+    console.log('[Push] Notification handler set successfully.');
+} catch (error) {
+    console.error('[Push] Failed to set notification handler:', error);
 }
 
 export async function registerForPushNotificationsAsync() {
-    // Log if in Expo Go, but attempt registration anyway for debugging
-    if (isExpoGo) {
-        console.log('[Push] Registration: Attempting in Expo Go (might be unreliable in SDK 53+).');
-    }
+    let token;
 
     if (Platform.OS === 'android') {
         try {
-            const channel = await Notifications.getNotificationChannelAsync('default');
-            if (!channel) {
-                await Notifications.setNotificationChannelAsync('default', {
-                    name: 'default',
-                    importance: Notifications.AndroidImportance.MAX,
-                    vibrationPattern: [0, 250, 250, 250],
-                    lightColor: '#FF231F7C',
-                });
-            }
-        } catch (e) {
-            console.warn('Failed to set notification channel:', e);
+            await Notifications.setNotificationChannelAsync('default', {
+                name: 'default',
+                importance: Notifications.AndroidImportance.MAX,
+                vibrationPattern: [0, 250, 250, 250],
+                lightColor: '#8B5CF6',
+            });
+            console.log('[Push] Android notification channel set.');
+        } catch (error) {
+            console.error('[Push] Error setting Android channel:', error);
         }
     }
 
-    if (!Device.isDevice) {
-        console.log('Must use physical device for Push Notifications');
-        return null;
-    }
-
-    try {
+    if (Device.isDevice) {
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
         if (existingStatus !== 'granted') {
@@ -55,21 +44,37 @@ export async function registerForPushNotificationsAsync() {
             finalStatus = status;
         }
         if (finalStatus !== 'granted') {
-            console.log('Failed to get push token: Permission not granted');
-            return null;
+            console.warn('[Push] Failed to get push token: permission not granted.');
+            return;
         }
 
-        const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-        if (!projectId) {
-            console.warn('EAS Project ID not found.');
-            return null;
-        }
+        try {
+            const projectId = Constants?.expoConfig?.extra?.eas?.projectId ||
+                Constants?.easConfig?.projectId ||
+                'f07ecfd4-560b-4690-8f40-3d56298ab784';
 
-        const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-        console.log("Expo Push Token:", token);
-        return token;
-    } catch (e) {
-        console.error("Error getting push token:", e);
-        return null;
+            if (!projectId) {
+                console.warn('[Push] EAS Project ID not found. Registration might fail.');
+            }
+
+            console.log('[Push] Requesting token with Project ID:', projectId);
+
+            // Get Expo token
+            token = (await Notifications.getExpoPushTokenAsync({
+                projectId: projectId
+            })).data;
+
+            console.log('[Push] Expo Token generated successfully.');
+            return token;
+        } catch (error) {
+            console.error('[Push] Fatal Error getting push token:', error.message);
+            if (error.message.includes('Network request failed')) {
+                console.error('[Push] Network Error: Please check your internet connection on the device.');
+            }
+        }
+    } else {
+        console.log('[Push] Must use physical device for Push Notifications');
     }
+
+    return token;
 }

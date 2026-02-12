@@ -24,7 +24,10 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 router.post('/', upload.single('file'), (req, res) => {
+    console.log(`[Push-Debug] [Upload] Generic upload request. File:`, req.file ? req.file.originalname : 'NONE');
+
     if (!req.file) {
+        console.error(`[Push-Debug] [Upload] Generic upload failed: No file in request`);
         return res.status(400).json({ error: 'No file uploaded' });
     }
 

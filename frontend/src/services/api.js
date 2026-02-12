@@ -10,7 +10,7 @@ const getDevUrl = () => {
 
     // Dynamic IP Detection for Expo Go
     const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest2?.extra?.expoGo?.debuggerHost;
-    const localhost = debuggerHost?.split(':')[0] || '10.188.11.250'; // Fallback to last known good IP
+    const localhost = debuggerHost?.split(':')[0] || '10.213.145.250'; // Updated fallback to current system IP
     return `http://${localhost}:5001/api`;
 };
 
@@ -331,45 +331,55 @@ export const fetchRelationship = async (targetId, currentUserId) => {
 
 // Media Upload (Image/Video)
 export const uploadMedia = async (uri, type = 'image') => {
-    const filename = uri.split('/').pop();
-    const match = /\.(\w+)$/.exec(filename);
-    const ext = match ? match[1].toLowerCase() : 'jpg';
-
-    // Determine mime type
-    let mimeType = 'image/jpeg';
-    if (type === 'video') {
-        mimeType = `video/${ext}`;
-    } else {
-        mimeType = `image/${ext === 'jpeg' || ext === 'jpg' ? 'jpeg' : ext}`;
-    }
-
-    console.log(`[API] Uploading media: ${filename}, type: ${mimeType}`);
-    console.log(`[API] Target URL: ${API_URL}/posts/upload-media`);
-
     try {
+        if (!uri) throw new Error('No URI provided for upload');
+
+        const filename = uri.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename);
+        const ext = match ? match[1].toLowerCase() : 'jpg';
+
+        // Determine mime type
+        let mimeType = type === 'video' ? `video/${ext}` : `image/${ext === 'jpeg' || ext === 'jpg' ? 'jpeg' : ext}`;
+
+        console.log(`[Push-Debug] [API] Uploading media: ${filename}, type: ${mimeType}`);
+        const targetUrl = `${API_URL}/posts/upload-media`;
+        console.log(`[Push-Debug] [API] Target URL: ${targetUrl}`);
+
         const formData = new FormData();
-        const fileUri = Platform.OS === 'ios' ? uri.replace('file://', '') : uri;
+        // Robust URI cleaning
+        const cleanUri = Platform.OS === 'ios' ? uri.replace('file://', '') : uri;
 
         formData.append('media', {
-            uri: fileUri,
+            uri: cleanUri,
             name: filename || (type === 'video' ? 'video.mp4' : 'image.jpg'),
             type: mimeType
         });
 
-        const response = await fetch(`${API_URL}/posts/upload-media`, {
+        const response = await fetch(targetUrl, {
             method: 'POST',
             body: formData,
             headers: {
                 'Accept': 'application/json',
+                // Note: Do NOT set Content-Type for FormData, fetch handles it with boundary
             },
         });
 
-        const data = await response.json();
-        console.log(`[API] Response status: ${response.status}`, data);
+        const responseText = await response.text();
+        console.log(`[Push-Debug] [API] Raw Response (${response.status}):`, responseText);
+
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            throw new Error(`Invalid server response (${response.status}): ${responseText.substring(0, 100)}...`);
+        }
+
         if (!response.ok) throw new Error(data.error || `Upload failed (${response.status})`);
+
+        console.log(`[Push-Debug] [API] Upload Success:`, data.url);
         return data.url;
     } catch (error) {
-        console.error('[API] Media Upload Error:', error.message);
+        console.error('[Push-Debug] [API] Media Upload Error:', error.message);
         throw error;
     }
 };
@@ -859,8 +869,12 @@ export const forwardMessage = async (messageId, userId, recipientId) => {
 
 export const uploadFile = async (uri) => {
     try {
-        console.log(`[API] Starting upload for URI: ${uri}`);
-        const formData = new FormData();
+        console.log(`[Push-Debug] [API] Starting file upload for URI: ${uri}`);
+
+        // We can reuse the robust uploadMedia logic but targeting /api/upload instead if needed
+        // However, looking at the backend, /api/posts/upload-media and /api/upload are similar.
+        // Let's keep it specific to /api/upload for Ads to be safe, but add the same logging.
+
         const filename = uri.split('/').pop();
         const match = /\.(\w+)$/.exec(filename);
         const ext = match ? match[1].toLowerCase() : '';
@@ -878,27 +892,40 @@ export const uploadFile = async (uri) => {
             type = 'application/octet-stream';
         }
 
-        const cleanUri = Platform.OS === 'android' ? uri : uri.replace('file://', '');
+        const cleanUri = Platform.OS === 'ios' ? uri.replace('file://', '') : uri;
 
+        const formData = new FormData();
         formData.append('file', {
             uri: cleanUri,
             name: filename || 'file',
             type
         });
 
-        console.log(`[API] Uploading to: ${API_URL}/upload`);
-        const response = await fetch(`${API_URL}/upload`, {
+        const targetUrl = `${API_URL}/upload`;
+        console.log(`[Push-Debug] [API] Uploading to: ${targetUrl}`);
+
+        const response = await fetch(targetUrl, {
             method: 'POST',
             body: formData,
+            headers: { 'Accept': 'application/json' }
         });
 
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Upload failed');
-        console.log(`[API] Upload successful: ${data.url}`);
+        const responseText = await response.text();
+        console.log(`[Push-Debug] [API] Generic Upload Response (${response.status}):`, responseText);
+
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            throw new Error(`Server returned non-JSON: ${responseText.substring(0, 100)}`);
+        }
+
+        if (!response.ok) throw new Error(data.error || `Upload failed (${response.status})`);
+
+        console.log(`[Push-Debug] [API] Generic Upload Success: ${data.url}`);
         return data.url;
     } catch (error) {
-        console.error('File Upload Error:', error);
-        // Fallback or retry logic could go here
+        console.error('[Push-Debug] [API] File Upload Error:', error);
         throw error;
     }
 };

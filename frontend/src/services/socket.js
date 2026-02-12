@@ -1,9 +1,17 @@
 import { io } from 'socket.io-client';
+import Constants from 'expo-constants';
 
 const PRODUCTION_SOCKET_URL = 'https://unisphere-api.onrender.com';
-const DEVELOPMENT_SOCKET_URL = 'http://10.188.11.250:5001';
 
-// __DEV__ is true during local development, false in production builds
+const getDevSocketUrl = () => {
+    // Dynamic IP Detection for Expo Go
+    const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest2?.extra?.expoGo?.debuggerHost;
+    const localhost = debuggerHost?.split(':')[0] || '10.213.145.250'; // Updated fallback
+    return `http://${localhost}:5001`;
+};
+
+const DEVELOPMENT_SOCKET_URL = getDevSocketUrl();
+
 const SOCKET_URL = __DEV__ ? DEVELOPMENT_SOCKET_URL : PRODUCTION_SOCKET_URL;
 
 let socket = null;

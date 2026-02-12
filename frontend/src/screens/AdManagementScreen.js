@@ -111,8 +111,8 @@ export default function AdManagementScreen({ onBack, currentUser }) {
             loadAds();
             Alert.alert("Success", "Ad posted successfully! ✨");
         } catch (error) {
-            console.error('[AdManagement] Create Error:', error);
-            Alert.alert("Error", error.message || "Failed to create ad");
+            console.error('[Push-Debug] [AdManagement] Create Error:', error);
+            Alert.alert("Error", `Failed to create ad: ${error.message}`);
         } finally {
             setSubmitting(false);
         }

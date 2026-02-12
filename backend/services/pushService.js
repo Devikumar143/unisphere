@@ -9,41 +9,52 @@ const expo = new Expo();
  */
 const sendPushToUser = async (userId, title, body, data = {}) => {
     try {
+        console.log(`[PushService] Attempting to send push to User: ${userId}`);
         const result = await query('SELECT bio_metadata FROM users WHERE id = $1', [userId]);
-        if (result.rows.length === 0) return;
+        if (result.rows.length === 0) {
+            console.log(`[PushService] User ${userId} not found in database.`);
+            return;
+        }
 
         const metadata = result.rows[0].bio_metadata || {};
         const pushToken = metadata.pushToken;
 
-        if (!pushToken || !Expo.isExpoPushToken(pushToken)) {
-            // Not a valid token, or no token stored
-            if (pushToken) {
-                console.error(`Push token ${pushToken} is not a valid Expo push token`);
-            }
+        if (!pushToken) {
+            console.log(`[PushService] No push token found for User: ${userId}`);
             return;
         }
 
-        const messages = [{
+        if (!Expo.isExpoPushToken(pushToken)) {
+            console.error(`[PushService] Invalid Expo push token for User: ${userId}: ${pushToken}`);
+            return;
+        }
+
+        const message = {
             to: pushToken,
             sound: 'default',
             title,
             body,
             data,
-        }];
+            priority: 'high',
+            channelId: 'default', // matches frontend channel
+        };
 
-        const chunks = expo.chunkPushNotifications(messages);
-        for (const chunk of chunks) {
-            try {
-                const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-                console.log('Push notification ticket:', ticketChunk);
-                // NOTE: In a production app, you should check for errors in tickets
-                // and potentially remove invalid tokens from your database.
-            } catch (error) {
-                console.error('Error sending push chunk:', error);
+        console.log(`[PushService] Sending message to Expo:`, JSON.stringify(message));
+        const tickets = await expo.sendPushNotificationsAsync([message]);
+        console.log(`[PushService] Expo response tickets:`, JSON.stringify(tickets));
+
+        if (tickets[0] && tickets[0].status === 'error') {
+            console.error(`[PushService] Expo error for User ${userId}:`, tickets[0].message);
+            if (tickets[0].details && tickets[0].details.error === 'DeviceNotRegistered') {
+                console.warn(`[PushService] Device no longer registered for User ${userId}. Token: ${pushToken}`);
+                // In a production app, you might want to remove this token from the user's bio_metadata
             }
+        } else {
+            console.log(`[PushService] Push successfully queued for User: ${userId}`);
         }
-    } catch (e) {
-        console.error('Error in sendPushToUser:', e);
+
+    } catch (error) {
+        console.error(`[PushService] Fatal error sending push to User ${userId}:`, error);
     }
 };
 

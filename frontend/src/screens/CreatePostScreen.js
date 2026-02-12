@@ -39,7 +39,8 @@ export default function CreatePostScreen({ user, onBack, isStory, communityConte
                 const uploadedUrl = await uploadImage(result.assets[0].uri);
                 setImageUrl(uploadedUrl);
             } catch (error) {
-                Alert.alert('Upload Failed', 'Could not upload selected image.');
+                console.error('[Push-Debug] Post Upload Error:', error);
+                Alert.alert('Upload Failed', error.message || 'Could not upload selected image.');
             } finally {
                 setUploading(false);
             }
