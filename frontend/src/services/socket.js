@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 import Constants from 'expo-constants';
 
-const PRODUCTION_SOCKET_URL = 'https://unisphere-api.onrender.com';
+const PRODUCTION_SOCKET_URL = 'https://unisphere-6t8k.onrender.com';
 
 const getDevSocketUrl = () => {
     // Dynamic IP Detection for Expo Go

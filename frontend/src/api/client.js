@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 // For physical devices, use your computer's local IP address instead of localhost
-const PRODUCTION_URL = 'https://unisphere-api.onrender.com/api';
+const PRODUCTION_URL = 'https://unisphere-6t8k.onrender.com/api';
 
 const getDevUrl = () => {
     if (Platform.OS === 'web') return 'http://localhost:5001/api';

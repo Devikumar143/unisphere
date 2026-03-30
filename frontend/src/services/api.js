@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // --- Production Configuration ---
-const PRODUCTION_URL = 'https://unisphere-api.onrender.com/api';
+const PRODUCTION_URL = 'https://unisphere-6t8k.onrender.com/api';
 
 const getDevUrl = () => {
     if (Platform.OS === 'web') return 'http://localhost:5001/api';

@@ -13,15 +13,7 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
+const { storage } = require('../config/cloudinary');
 
 const upload = multer({ storage: storage });
 
@@ -348,8 +340,7 @@ router.post('/:id/avatar', upload.single('avatar'), async (req, res) => {
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        const protocol = req.get('x-forwarded-proto') || req.protocol;
-        const avatarUrl = `${protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        const avatarUrl = req.file.path;
 
         // Get existing metadata
         const userRes = await query('SELECT bio_metadata FROM users WHERE id = $1', [id]);

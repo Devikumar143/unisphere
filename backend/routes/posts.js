@@ -12,15 +12,7 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
+const { storage } = require('../config/cloudinary');
 
 const upload = multer({ storage: storage });
 
@@ -177,9 +169,8 @@ router.post('/upload-media', upload.single('media'), async (req, res) => {
     }
 
     try {
-        const protocol = req.get('x-forwarded-proto') || req.protocol;
-        const fileUrl = `${protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-        console.log(`[Push-Debug] [Posts] Upload success:`, fileUrl);
+        const fileUrl = req.file.path;
+        console.log(`[Cloudinary] [Posts] Upload success:`, fileUrl);
         res.json({ url: fileUrl, type: req.file.mimetype });
     } catch (err) {
         console.error(`[Push-Debug] [Posts] Upload Error:`, err);
