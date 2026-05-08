@@ -65,7 +65,7 @@ router.post('/register', async (req, res) => {
         });
         res.status(500).json({ 
             error: 'Server error during registration',
-            details: process.env.NODE_ENV === 'production' ? null : err.message 
+            details: err.message 
         });
     }
 });
