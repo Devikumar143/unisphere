@@ -817,9 +817,8 @@ app.use((err, req, res, next) => {
 
     const statusCode = err.status || 500;
     const response = {
-        error: process.env.NODE_ENV === 'production'
-            ? 'An internal server error occurred'
-            : err.message
+        error: 'An internal server error occurred',
+        details: err.message
     };
 
     if (process.env.NODE_ENV !== 'production') {
