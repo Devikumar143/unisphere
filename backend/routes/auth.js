@@ -57,8 +57,16 @@ router.post('/register', async (req, res) => {
             }
         });
     } catch (err) {
-        console.error('[Auth] Registration Database Error:', err);
-        res.status(500).json({ error: err.message || 'Server error during registration' });
+        console.error('[Auth] Registration Error:', {
+            message: err.message,
+            stack: err.stack,
+            code: err.code, // Useful for Postgres error codes
+            detail: err.detail
+        });
+        res.status(500).json({ 
+            error: 'Server error during registration',
+            details: process.env.NODE_ENV === 'production' ? null : err.message 
+        });
     }
 });
 

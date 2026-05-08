@@ -16,7 +16,16 @@ const poolConfig = process.env.DATABASE_URL
         port: process.env.DB_PORT || 5432,
     };
 
-const pool = new Pool(poolConfig);
+const pool = new Pool({
+    ...poolConfig,
+    connectionTimeoutMillis: 5000, // 5 seconds timeout
+    idleTimeoutMillis: 30000,    // 30 seconds idle timeout
+});
+
+// Pool error handling to prevent server crashes
+pool.on('error', (err) => {
+    console.error('Unexpected error on idle database client:', err.message);
+});
 
 module.exports = {
     query: (text, params) => pool.query(text, params),

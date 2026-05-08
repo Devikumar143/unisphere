@@ -59,7 +59,7 @@ export const loginUser = async (email, password) => {
     }
 };
 
-export const registerUser = async (userData) => {
+export const registerUser = async (userData, retries = 2) => {
     try {
         const response = await fetch(`${API_URL}/auth/register`, {
             method: 'POST',
@@ -68,11 +68,17 @@ export const registerUser = async (userData) => {
         });
         const data = await response.json();
         if (!response.ok) {
-            console.error('[API] Registration Failed:', data.error || 'Unknown Error', { status: response.status });
-            throw new Error(data.error || 'Registration failed');
+            console.error('[API] Registration Failed:', data.error || data.details || 'Unknown Error', { status: response.status });
+            throw new Error(data.error || data.details || 'Registration failed');
         }
         return data;
     } catch (error) {
+        // Retry on network errors or connection resets
+        if (retries > 0 && (error.message.includes('ECONNRESET') || error.message.includes('Network request failed'))) {
+            console.log(`[API] Registration failed, retrying... (${retries} attempts left)`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+            return registerUser(userData, retries - 1);
+        }
         console.error('[API] Registration Network Error:', error);
         throw error;
     }

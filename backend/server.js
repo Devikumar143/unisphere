@@ -41,9 +41,7 @@ app.use(limiter);
 // Security & Middleware
 app.use(helmet());
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production'
-        ? ['https://your-production-app.com'] // REPLACE with your real app domain
-        : '*',
+    origin: '*', // Allow all origins for mobile compatibility
     credentials: true
 }));
 app.use(express.json({ limit: '1mb' })); // Restricted in production
@@ -124,9 +122,7 @@ app.get('/', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: process.env.NODE_ENV === 'production'
-            ? ["https://your-production-app.com"]
-            : "*",
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
