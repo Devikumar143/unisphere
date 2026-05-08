@@ -64,8 +64,7 @@ router.post('/register', async (req, res) => {
             detail: err.detail
         });
         res.status(500).json({ 
-            error: 'Server error during registration',
-            details: err.message 
+            error: `Server error: ${err.message}`
         });
     }
 });
